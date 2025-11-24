@@ -25,7 +25,7 @@ const MissionaryBio: React.FC<MissionaryBioProps> = ({ language }) => {
       const data = await getMissionaryBioWithMaps(name + ` (Reply in ${language})`);
       setBioData(data);
     } catch (e) {
-      alert("Could not fetch biography.");
+      alert("Could not fetch biography. Check network/API Key.");
     } finally {
       setLoading(false);
     }
@@ -66,12 +66,8 @@ const MissionaryBio: React.FC<MissionaryBioProps> = ({ language }) => {
     const url = await speakText(bioData.text);
     if (url) {
       setAudioUrl(url);
-      setTimeout(() => {
-        if (audioRef.current) {
-          audioRef.current.play().catch(console.error);
-          setIsPlaying(true);
-        }
-      }, 100);
+      setIsPlaying(true);
+      // Auto-play handled by audio tag
     }
   };
 
@@ -82,7 +78,6 @@ const MissionaryBio: React.FC<MissionaryBioProps> = ({ language }) => {
       } else {
         audioRef.current.play();
       }
-      setIsPlaying(!isPlaying);
     }
   };
 
@@ -148,6 +143,7 @@ const MissionaryBio: React.FC<MissionaryBioProps> = ({ language }) => {
                        <audio 
                          ref={audioRef} 
                          src={audioUrl} 
+                         autoPlay
                          onEnded={() => setIsPlaying(false)} 
                          onPause={() => setIsPlaying(false)}
                          onPlay={() => setIsPlaying(true)}

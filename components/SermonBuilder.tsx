@@ -39,8 +39,8 @@ const SermonBuilder: React.FC<SermonBuilderProps> = ({ language }) => {
         { audience, includeDeepContext }
       );
       setSermon(result);
-    } catch {
-      alert("Error generating sermon");
+    } catch (e: any) {
+      setSermon(`Error: ${e.message}`);
     } finally {
       setLoading(false);
     }
@@ -81,12 +81,8 @@ const SermonBuilder: React.FC<SermonBuilderProps> = ({ language }) => {
     const url = await speakText(sermon);
     if (url) {
       setAudioUrl(url);
-      setTimeout(() => {
-        if (audioRef.current) {
-          audioRef.current.play().catch(console.error);
-          setIsPlaying(true);
-        }
-      }, 100);
+      setIsPlaying(true);
+      // Auto-play handled by audio tag
     }
   };
 
@@ -97,7 +93,6 @@ const SermonBuilder: React.FC<SermonBuilderProps> = ({ language }) => {
       } else {
         audioRef.current.play();
       }
-      setIsPlaying(!isPlaying);
     }
   };
 
@@ -190,6 +185,7 @@ const SermonBuilder: React.FC<SermonBuilderProps> = ({ language }) => {
                        <audio 
                          ref={audioRef} 
                          src={audioUrl} 
+                         autoPlay
                          onEnded={() => setIsPlaying(false)} 
                          onPause={() => setIsPlaying(false)}
                          onPlay={() => setIsPlaying(true)}

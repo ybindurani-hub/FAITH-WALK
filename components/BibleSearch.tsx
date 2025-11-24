@@ -24,8 +24,8 @@ const BibleSearch: React.FC<BibleSearchProps> = ({ language }) => {
     try {
       const text = await searchBible(query + ` (Reply in ${language})`);
       setResult(text);
-    } catch (e) {
-      setResult("An error occurred.");
+    } catch (e: any) {
+      setResult(`Error: ${e.message}`);
     } finally {
       setLoading(false);
     }
@@ -67,12 +67,8 @@ const BibleSearch: React.FC<BibleSearchProps> = ({ language }) => {
     const url = await speakText(result);
     if (url) {
       setAudioUrl(url);
-      setTimeout(() => {
-        if (audioRef.current) {
-          audioRef.current.play().catch(console.error);
-          setIsPlaying(true);
-        }
-      }, 100);
+      setIsPlaying(true);
+      // Auto-play handled by audio tag attribute
     }
   };
 
@@ -83,7 +79,7 @@ const BibleSearch: React.FC<BibleSearchProps> = ({ language }) => {
       } else {
         audioRef.current.play();
       }
-      setIsPlaying(!isPlaying);
+      // State updates via onPlay/onPause handlers on the element
     }
   };
 
@@ -132,6 +128,7 @@ const BibleSearch: React.FC<BibleSearchProps> = ({ language }) => {
                    <audio 
                      ref={audioRef} 
                      src={audioUrl} 
+                     autoPlay
                      onEnded={() => setIsPlaying(false)} 
                      onPause={() => setIsPlaying(false)}
                      onPlay={() => setIsPlaying(true)}

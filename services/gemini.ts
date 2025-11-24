@@ -8,19 +8,25 @@ const ai = new GoogleGenAI({ apiKey });
 export const cleanMarkdown = (text: string): string => {
   if (!text) return "";
   return text
-    .replace(/\*\*/g, '')   // Remove bold
-    .replace(/###/g, '')    // Remove H3
-    .replace(/##/g, '')     // Remove H2
-    .replace(/#/g, '')      // Remove H1
-    .replace(/`/g, '')      // Remove code blocks
-    .replace(/_/g, '')      // Remove italics
-    .replace(/^\s*-\s/gm, '• ') // Replace bullets with proper dots
+    .replace(/\*\*/g, '')         // Remove bold
+    .replace(/\*/g, '')           // Remove italics/bullets
+    .replace(/###/g, '')          // Remove H3
+    .replace(/##/g, '')           // Remove H2
+    .replace(/#/g, '')            // Remove H1
+    .replace(/`/g, '')            // Remove code blocks
+    .replace(/_/g, '')            // Remove underscores
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // Remove links but keep text: [text](url) -> text
+    .replace(/^\s*-\s/gm, '• ')   // Replace dash bullets with dots
+    .replace(/\n\s*\n/g, '\n\n')  // Fix multiple newlines
     .trim();
 };
 
 // --- Text & Multi-modal Generation ---
 
 export const searchBible = async (query: string): Promise<string> => {
+  if (!apiKey) {
+    return "Configuration Error: API Key is missing. Please check your Vercel Environment Variables.";
+  }
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
@@ -48,15 +54,15 @@ export const searchBible = async (query: string): Promise<string> => {
       Focus on building faith.
       Provide an answer based ONLY on the Bible. 
       If quoting, provide the Book, Chapter, and Verse. 
-      Format the output with clear paragraphs and bullet points.`,
+      Format the output with clear paragraphs.`,
       config: {
         maxOutputTokens: 8192, // Ensure full length responses
       }
     });
     return response.text || "No answer found in the Bible.";
-  } catch (error) {
+  } catch (error: any) {
     console.error("Bible Search Error:", error);
-    return "Sorry, I encountered an error searching the scriptures.";
+    return `Error: ${error.message || "Unknown error occurred"}. Please check your connection and API Key.`;
   }
 };
 
@@ -66,6 +72,8 @@ interface SermonOptions {
 }
 
 export const generateSermon = async (topic: string, options: SermonOptions): Promise<string> => {
+  if (!apiKey) return "Configuration Error: API Key is missing.";
+  
   const { audience, includeDeepContext } = options;
   
   let prompt = `Role: You are a World-Renowned Christian Theologian and Master of Homiletics.
@@ -102,7 +110,7 @@ export const generateSermon = async (topic: string, options: SermonOptions): Pro
     - Provide a section on "Hermeneutical Insight" for the main text.`;
   }
 
-  prompt += `\nUse clear formatting.`;
+  prompt += `\nUse clear formatting. Do NOT use markdown bolding (**) symbols.`;
 
   try {
     const response = await ai.models.generateContent({
@@ -113,13 +121,15 @@ export const generateSermon = async (topic: string, options: SermonOptions): Pro
       }
     });
     return response.text || "Could not generate sermon.";
-  } catch (error) {
+  } catch (error: any) {
     console.error("Sermon Gen Error:", error);
-    return "Error generating sermon. Please try again.";
+    return `Error: ${error.message}. Please try again.`;
   }
 };
 
 export const getMissionaryBioWithMaps = async (name: string) => {
+  if (!apiKey) return { text: "Configuration Error: API Key is missing.", locations: [] };
+
   try {
     // Using Maps Grounding to find locations relevant to the missionary
     // Softened prompt to prevent "I cannot help" errors on obscure names
@@ -169,11 +179,11 @@ export const getMissionaryBioWithMaps = async (name: string) => {
     }
 
     return { text, locations };
-  } catch (error) {
+  } catch (error: any) {
     console.error("Bio Error:", error);
     // Fallback response instead of crashing
     return { 
-      text: "I am having trouble connecting to the archives right now. However, remember that every step of faith is recorded in Heaven. Please try searching again with more specific details, like the country they served in.", 
+      text: `I am having trouble connecting to the archives right now (Error: ${error.message}). Please ensure your API Key allows Maps Grounding and try again.`, 
       locations: [] 
     };
   }
@@ -231,9 +241,10 @@ function writeString(view: DataView, offset: number, string: string) {
 }
 
 export const speakText = async (text: string): Promise<string | null> => {
+  if (!apiKey) return null;
   try {
     // Helper to strip markdown for cleaner speech
-    const cleanText = text.replace(/[*#_`]/g, ''); 
+    const cleanText = text.replace(/[*#_`]/g, '').replace(/\[.*?\]/g, ''); 
     
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash-preview-tts",
@@ -265,6 +276,8 @@ export const connectLiveSession = async (
   onAudioData: (buffer: AudioBuffer) => void,
   onClose: () => void
 ) => {
+  if (!apiKey) throw new Error("API Key Missing");
+
   const inputAudioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
   const outputAudioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
   
