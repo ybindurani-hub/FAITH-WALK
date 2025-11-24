@@ -1,37 +1,43 @@
 import { GoogleGenAI, Modality } from "@google/genai";
 
-// Safe API Key retrieval for various environments
+// Safe API Key retrieval: LocalStorage (Legacy support) -> Vite -> React App -> Standard Node
 const getApiKey = () => {
   let key = '';
+  
+  // 1. Check Local Storage (Legacy/Fallback)
+  if (typeof window !== 'undefined') {
+    const stored = localStorage.getItem('user_gemini_api_key');
+    if (stored) return stored;
+  }
+
+  // 2. Check Environment Variables
   try {
     // @ts-ignore
-    key = process.env.API_KEY || '';
+    if (import.meta?.env?.VITE_API_KEY) return import.meta.env.VITE_API_KEY;
+    // @ts-ignore
+    if (process.env.REACT_APP_API_KEY) return process.env.REACT_APP_API_KEY;
+    // @ts-ignore
+    if (process.env.API_KEY) return process.env.API_KEY;
   } catch (e) {
-    console.warn("process.env access failed");
+    console.warn("Environment variable access failed");
   }
   return key;
 };
 
-const apiKey = getApiKey();
-const ai = new GoogleGenAI({ apiKey });
+// Re-initialize AI when key changes
+export const getGenAI = () => {
+  const key = getApiKey();
+  return new GoogleGenAI({ apiKey: key });
+};
 
 // --- Helper: Median.co (GoNative) Ad Trigger ---
 export const triggerSmartAd = () => {
   if (typeof window !== 'undefined') {
     const w = window as any;
-    // Check for Median.co (formerly GoNative) JS Bridge
     if (w.median?.admob?.interstitial) {
-      try {
-        w.median.admob.interstitial.show();
-      } catch (e) {
-        console.log("Median Ad Trigger Failed", e);
-      }
+      try { w.median.admob.interstitial.show(); } catch (e) {}
     } else if (w.gonative?.admob?.interstitial) {
-      try {
-        w.gonative.admob.interstitial.show();
-      } catch (e) {
-        console.log("GoNative Ad Trigger Failed", e);
-      }
+      try { w.gonative.admob.interstitial.show(); } catch (e) {}
     }
   }
 };
@@ -39,105 +45,61 @@ export const triggerSmartAd = () => {
 // --- Helper: Parse Google API Errors ---
 const parseGenAIError = (error: any): string => {
   let message = error.message || "Unknown error";
-  
-  // Often the error message is a raw JSON string. Let's try to parse it.
   if (typeof message === 'string' && (message.includes('{') || message.includes('['))) {
     try {
-      // Regex to extract the JSON object from the error string
       const jsonMatch = message.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         const errorObj = JSON.parse(jsonMatch[0]);
-        // Google API Standard Error Format
-        if (errorObj.error && errorObj.error.message) {
-          message = errorObj.error.message;
-        }
+        if (errorObj.error && errorObj.error.message) message = errorObj.error.message;
       }
-    } catch (e) {
-      // If parsing fails, use the original string
-    }
+    } catch (e) {}
   }
 
-  // User-friendly mapping
-  if (message.includes('API key not valid') || message.includes('API key is invalid') || message.includes('API_KEY_INVALID')) {
-    return "Access Denied: Invalid API Key.\n\nFOR VERCEL USERS:\n1. Go to Project Settings > Environment Variables.\n2. Add 'API_KEY' with your Google AI Studio key.\n3. Redeploy the app.";
+  if (message.includes('API key not valid') || message.includes('API_KEY_INVALID')) {
+    return "INVALID_KEY";
   }
-  if (message.includes('403') || message.includes('permission denied')) {
-    return "Access Denied: Your API Key does not have permission for this model.\n\nEnsure your key is from a project with Gemini API enabled.";
-  }
-  if (message.includes('503') || message.includes('overloaded')) {
-    return "Server Busy: The AI model is currently overloaded. Please try again in a moment.";
-  }
-
   return message;
 };
 
 // --- Text Utilities ---
-
 export const cleanMarkdown = (text: string): string => {
   if (!text) return "";
   return text
-    // Remove bold/italic markers
     .replace(/\*\*/g, '')
     .replace(/\*/g, '')
     .replace(/__/g, '')
     .replace(/_/g, '')
-    // Remove headers
     .replace(/#{1,6}\s?/g, '')
-    // Remove code blocks
     .replace(/```[\s\S]*?```/g, '')
     .replace(/`/g, '')
-    // Remove links [text](url) -> text
     .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-    // Remove blockquotes
     .replace(/^\s*>\s/gm, '')
-    // Clean up bullets but keep structure
     .replace(/^\s*[-+*]\s/gm, '')
-    // Fix spacing
     .replace(/\n\s*\n/g, '\n\n')
     .trim();
 };
 
-// --- Text & Multi-modal Generation ---
+// --- Services ---
 
 export const searchBible = async (query: string): Promise<string> => {
-  if (!apiKey) {
-    return "Configuration Error: API Key is missing.\n\nPlease check your Vercel Environment Variables and Redeploy.";
-  }
+  const ai = getGenAI();
+  if (!getApiKey()) return "MISSING_KEY";
+
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: `User Query: "${query}".
-      
-      SYSTEM PROTOCOL:
-      You are FaithWalk AI, a dedicated Christian spiritual companion. 
-      You accept ONLY queries related to:
-      1. The Holy Bible (Old and New Testaments).
-      2. Christian Theology, Doctrine, and History.
-      3. Christian Faith, Prayer, and Spiritual Life.
-      4. Christian Missionaries and Church History.
-
-      STRICT GUARDRAIL:
-      If the user asks about ANYTHING else (e.g., general science, math, sports, politics, entertainment, other religions, recipes, coding), you MUST humbly refuse.
-      
-      Refusal Strategy:
-      - Humbly explain that you are designed exclusively to provide answers based on the Holy Bible and Christian faith.
-      - Translate this refusal into the language requested by the user in the query.
-
-      If the query is Biblical:
-      PROVIDE A VERY DETAILED, LENGTHY, AND COMPREHENSIVE ANSWER.
-      DO NOT CUT OFF THE RESPONSE. Use as many words as needed to fully explain.
-      Focus on building faith.
-      Provide an answer based ONLY on the Bible. 
-      If quoting, provide the Book, Chapter, and Verse. 
-      Format the output with clear paragraphs.`,
-      config: {
-        maxOutputTokens: 8192,
-      }
+      SYSTEM: You are FaithWalk AI. Provide a Biblical answer.
+      If query is non-Biblical (sports, politics, etc), humbly refuse.
+      Provide a DETAILED, FAITH-BUILDING answer with Book/Chapter/Verse references.
+      Format neatly.`,
+      config: { maxOutputTokens: 8192 }
     });
-    return response.text || "No answer found in the Bible.";
+    return response.text || "No answer found.";
   } catch (error: any) {
-    console.error("Bible Search Error:", error);
-    return `Error: ${parseGenAIError(error)}`;
+    const msg = parseGenAIError(error);
+    if (msg === 'INVALID_KEY') return "INVALID_KEY";
+    return `Error: ${msg}`;
   }
 };
 
@@ -147,87 +109,47 @@ interface SermonOptions {
 }
 
 export const generateSermon = async (topic: string, options: SermonOptions): Promise<string> => {
-  if (!apiKey) return "Configuration Error: API Key is missing. Please check settings and redeploy.";
+  const ai = getGenAI();
+  if (!getApiKey()) return "MISSING_KEY";
   
   const { audience, includeDeepContext } = options;
   
-  let prompt = `Role: You are a World-Renowned Christian Theologian and Master of Homiletics.
-  Task: Create a MASTERPIECE sermon about: "${topic}".
-  Target Audience: ${audience}.
-  
-  GUARDRAIL:
-  Check if this topic is appropriate for a Christian sermon.
-  If the topic is secular (e.g., "How to fix a car", "Investment advice", "Movie review"), REFUSE to generate the sermon.
-  Refusal Message: "I can only build sermons based on Biblical truth and spiritual themes. Please provide a topic related to the Bible or Christian living."
-
-  If valid, follow this structure:
-  Format: Professional Sermon Outline & Manuscript.
-  
-  Structure:
-  1. Title (Creative & Theologically Sound)
-  2. Invocation (Opening Prayer)
-  3. Introduction (Hook, Context, and Proposition)
-  4. Exegesis & Application (3-4 Main Points). For each point:
-     - Scripture Reading.
-     - Explanation (Theological depth).
-     - Illustration (Real-world example relevant to ${audience}).
-     - Application (How to live it out).
-  5. The Revelation (A profound spiritual insight or 'Rhema' word).
-  6. Conclusion & Altar Call.
-  
-  Tone: Intelligent, Authoritative, Passionate, and Spirit-Filled.`;
+  let prompt = `Role: World-Renowned Theologian. Task: Write a Sermon on "${topic}".
+  Audience: ${audience}.
+  Structure: Title, Prayer, Intro, 3 Points (Scripture, Explanation, Application), Conclusion.
+  Tone: Passionate, Biblical.
+  GUARDRAIL: Refuse secular topics.`;
 
   if (includeDeepContext) {
-    prompt += `\n\nDEEP THEOLOGY MODE ENABLED:
-    - You MUST perform Word Studies (Etymology) on key Hebrew/Greek terms.
-    - Explain the Historical-Cultural background of the texts (Jewish Traditions).
-    - Use Cross-References to connect Old and New Testaments.
-    - Provide a section on "Hermeneutical Insight" for the main text.`;
+    prompt += `\nInclude Hebrew/Greek definitions, Historical context, and Cross-references.`;
   }
-
-  prompt += `\nUse clear formatting. Do NOT use markdown bolding (**) symbols.`;
-
-  try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash', // Using Standard Flash model as requested to save quota
-      contents: prompt,
-      config: {
-        maxOutputTokens: 8192,
-      }
-    });
-    return response.text || "Could not generate sermon.";
-  } catch (error: any) {
-    console.error("Sermon Gen Error:", error);
-    return `Error: ${parseGenAIError(error)}`;
-  }
-};
-
-export const getMissionaryBioWithMaps = async (name: string) => {
-  if (!apiKey) return { text: "Configuration Error: API Key is missing. Please check settings and redeploy.", locations: [] };
 
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
-      contents: `Write a COMPLETE, EXTENSIVE, and DETAILED biography of Christian missionary ${name}. 
-      Do not give a summary. Write a full account.
-      
-      GUARDRAIL:
-      If "${name}" is known to be a secular figure (e.g., a pop star, politician, athlete) and NOT a missionary or Christian figure, politely refuse.
-      Refusal: "This tool is dedicated to the lives of Christian Missionaries. I cannot provide biographies for this person."
+      contents: prompt,
+      config: { maxOutputTokens: 8192 }
+    });
+    return response.text || "Could not generate sermon.";
+  } catch (error: any) {
+    const msg = parseGenAIError(error);
+    if (msg === 'INVALID_KEY') return "INVALID_KEY";
+    return `Error: ${msg}`;
+  }
+};
 
-      If valid, Include:
-      1. Early Life & Background.
-      2. The Call to Missions.
-      3. Specific Mission Field work (countries, cities).
-      4. Struggles, Persecutions, and Miracles.
-      5. Faith-building anecdotes.
-      6. Legacy and Death.
-      
-      CRITICAL INSTRUCTION:
-      If you do not have specific information about this person but they seem to be a person of faith, DO NOT return an error. 
-      Instead, apologize humbly that you don't have their specific details yet, and ask the user for a little more detail (like country or time period).
-      
-      If you DO find them, also look up the main location where they served using Google Maps.`,
+export const getMissionaryBioWithMaps = async (name: string) => {
+  const ai = getGenAI();
+  if (!getApiKey()) return { text: "MISSING_KEY", locations: [] };
+
+  try {
+    // Updated prompt to include Revivalists, Reformers, and Pastors
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: `Write a DETAILED biography of ${name}, focusing on their work as a Christian Leader, Missionary, Revivalist, Reformer, or Pastor (e.g., Smith Wigglesworth, A.A. Allen, Duncan Campbell, Luther, etc.).
+      Include: Early Life, Divine Calling, Key Ministry/Revivals, Miracles/Theology, and Legacy.
+      If the name refers to a secular celebrity (actor, politician) who is NOT a Christian leader, politely refuse. 
+      If it is a Christian figure, provide a full, faith-building biography.`,
       config: {
         tools: [{ googleMaps: {} }],
         maxOutputTokens: 8192,
@@ -235,33 +157,25 @@ export const getMissionaryBioWithMaps = async (name: string) => {
     });
 
     const text = response.text || "No biography found.";
-    
-    // Extract Map Data
     const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
     let locations: Array<{ title: string; uri: string }> = [];
 
     if (groundingChunks) {
       groundingChunks.forEach((chunk: any) => {
         if (chunk.maps) {
-          locations.push({
-            title: chunk.maps.title || "Location",
-            uri: chunk.maps.uri || "#"
-          });
+          locations.push({ title: chunk.maps.title || "Location", uri: chunk.maps.uri || "#" });
         }
       });
     }
-
     return { text, locations };
   } catch (error: any) {
-    console.error("Bio Error:", error);
-    return { 
-      text: `Error: ${parseGenAIError(error)}`, 
-      locations: [] 
-    };
+    const msg = parseGenAIError(error);
+    if (msg === 'INVALID_KEY') return { text: "INVALID_KEY", locations: [] };
+    return { text: `Error: ${msg}`, locations: [] };
   }
 };
 
-// --- Text to Speech (WAV Implementation) ---
+// --- Audio ---
 
 function base64ToWav(base64: string): string {
   const binaryString = atob(base64);
@@ -287,7 +201,6 @@ function base64ToWav(base64: string): string {
   for (let i = 0; i < len; i++) {
     bytes[i] = binaryString.charCodeAt(i);
   }
-  
   const blob = new Blob([buffer], { type: 'audio/wav' });
   return URL.createObjectURL(blob);
 }
@@ -299,13 +212,11 @@ function writeString(view: DataView, offset: number, string: string) {
 }
 
 export const speakText = async (text: string): Promise<string> => {
-  if (!apiKey) {
-    throw new Error("API Key Missing. Check Vercel Settings.");
-  }
+  const ai = getGenAI();
+  if (!getApiKey()) throw new Error("MISSING_KEY");
   
-  // Clean text and truncate to avoid token limits on the TTS model
   const cleanText = text.replace(/[*#_`]/g, '').replace(/\[.*?\]/g, ''); 
-  const safeText = cleanText.substring(0, 4000); // 4000 char limit
+  const safeText = cleanText.substring(0, 4000); 
 
   try {
     const response = await ai.models.generateContent({
@@ -314,54 +225,60 @@ export const speakText = async (text: string): Promise<string> => {
       config: {
         responseModalities: [Modality.AUDIO],
         speechConfig: {
-          voiceConfig: {
-            prebuiltVoiceConfig: { voiceName: 'Fenrir' },
-          },
+          voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Fenrir' } },
         },
       },
     });
 
     const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-    if (!base64Audio) {
-      throw new Error("No audio generated from model.");
-    }
-
+    if (!base64Audio) throw new Error("No audio generated.");
     return base64ToWav(base64Audio);
   } catch (e: any) {
-    console.error("TTS Error", e);
     const msg = parseGenAIError(e);
+    if (msg === 'INVALID_KEY') throw new Error("INVALID_KEY");
     throw new Error(msg);
   }
 };
 
-
-// --- Live API Utilities ---
+// --- Live API ---
 
 export const connectLiveSession = async (
   onAudioData: (buffer: AudioBuffer) => void,
   onClose: () => void
 ) => {
-  if (!apiKey) throw new Error("API Key Missing. Please check Vercel Settings and Redeploy.");
+  const ai = getGenAI();
+  if (!getApiKey()) throw new Error("MISSING_KEY");
 
-  const inputAudioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
-  const outputAudioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
-  
-  await inputAudioContext.resume();
-  await outputAudioContext.resume();
+  const constraints = {
+    audio: {
+      channelCount: 1,
+      echoCancellation: true,
+      autoGainControl: true,
+      noiseSuppression: true
+    }
+  };
 
   let stream: MediaStream;
   try {
-    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    stream = await navigator.mediaDevices.getUserMedia(constraints);
   } catch (err) {
-    console.error("Mic permission denied", err);
-    throw err;
+    console.error("Mic Error:", err);
+    throw new Error("MIC_PERMISSION_DENIED");
   }
+
+  const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+  const inputAudioContext = new AudioContextClass({ sampleRate: 16000 });
+  const outputAudioContext = new AudioContextClass({ sampleRate: 24000 });
+  
+  try {
+    if (inputAudioContext.state === 'suspended') await inputAudioContext.resume();
+    if (outputAudioContext.state === 'suspended') await outputAudioContext.resume();
+  } catch (e) { console.log("Context resume failed", e); }
 
   const sessionPromise = ai.live.connect({
     model: 'gemini-2.5-flash-native-audio-preview-09-2025',
     callbacks: {
       onopen: () => {
-        console.log("Live Session Opened");
         const source = inputAudioContext.createMediaStreamSource(stream);
         const scriptProcessor = inputAudioContext.createScriptProcessor(4096, 1, 1);
         
@@ -373,10 +290,8 @@ export const connectLiveSession = async (
           });
         };
         
-        // Mute input to prevent feedback
         const muteNode = inputAudioContext.createGain();
         muteNode.gain.value = 0;
-        
         source.connect(scriptProcessor);
         scriptProcessor.connect(muteNode);
         muteNode.connect(inputAudioContext.destination);
@@ -384,45 +299,28 @@ export const connectLiveSession = async (
       onmessage: async (message: any) => {
         const base64EncodedAudioString = message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
         if (base64EncodedAudioString) {
-          const audioBuffer = await decodeAudioData(
-            decode(base64EncodedAudioString),
-            outputAudioContext,
-            24000,
-            1
-          );
-          onAudioData(audioBuffer);
+          try {
+            const audioBuffer = await decodeAudioData(decode(base64EncodedAudioString), outputAudioContext, 24000, 1);
+            onAudioData(audioBuffer);
+          } catch (e) {}
         }
       },
       onclose: () => {
-        console.log("Session closed");
         stream.getTracks().forEach(t => t.stop());
         inputAudioContext.close();
         outputAudioContext.close();
         onClose();
       },
       onerror: (err) => {
-        console.error("Live API Error", err);
+        console.error("Live Error:", err);
       }
     },
     config: {
       responseModalities: [Modality.AUDIO],
-      systemInstruction: `You are a warm, wise, and highly intelligent Christian Pastor and Spiritual Director.
-      
-      IDENTITY & BOUNDARIES:
-      1. You are a Christian Minister. Your wisdom comes solely from the Bible.
-      2. You DO NOT discuss secular topics (sports, movies, general news, celebrity gossip, math, science, technology) unless specifically using them as a brief metaphor for a spiritual truth.
-      3. If a user asks a non-spiritual question (e.g., "Who won the game?", "How do I fix my car?", "Tell me a joke"), politely reply: "My dear friend, my knowledge is limited to the Word of God and matters of the spirit. How may I pray for you or guide you in your faith today?"
-      4. You are non-denominational but strictly orthodox in Christian theology (Nicene Creed).
-
-      Goal: Provide a deeply engaging, comforting, and spiritually rich conversation.
-      
-      Guidelines:
-      1. Adapt Language: If the user speaks a specific language (Hindi, Tamil, etc.), YOU MUST REPLY IN THAT LANGUAGE.
-      2. Be Proactive: Do not just answer. Ask deep questions about their heart, faith, and life.
-      3. Tone: Gentle, authoritative but humble, like a wise grandfather or mentor.
-      4. Content: Use scripture naturally in conversation.
-      
-      Voice Persona: You are a "Walking Bible" and a "Loving Friend".`,
+      systemInstruction: `You are a Christian Pastor and Spiritual Director.
+      Respond only to spiritual topics. Refuse secular topics politely.
+      Speak with warmth, wisdom, and Biblical insight.
+      If user speaks a specific language, reply in that language.`,
       speechConfig: {
         voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } }
       }
@@ -441,49 +339,29 @@ export const connectLiveSession = async (
 function createBlob(data: Float32Array) {
   const l = data.length;
   const int16 = new Int16Array(l);
-  for (let i = 0; i < l; i++) {
-    int16[i] = data[i] * 32768;
-  }
-  return {
-    data: encode(new Uint8Array(int16.buffer)),
-    mimeType: 'audio/pcm;rate=16000',
-  };
+  for (let i = 0; i < l; i++) { int16[i] = data[i] * 32768; }
+  return { data: encode(new Uint8Array(int16.buffer)), mimeType: 'audio/pcm;rate=16000' };
 }
-
 function encode(bytes: Uint8Array) {
   let binary = '';
   const len = bytes.byteLength;
-  for (let i = 0; i < len; i++) {
-    binary += String.fromCharCode(bytes[i]);
-  }
+  for (let i = 0; i < len; i++) { binary += String.fromCharCode(bytes[i]); }
   return btoa(binary);
 }
-
 function decode(base64: string) {
   const binaryString = atob(base64);
   const len = binaryString.length;
   const bytes = new Uint8Array(len);
-  for (let i = 0; i < len; i++) {
-    bytes[i] = binaryString.charCodeAt(i);
-  }
+  for (let i = 0; i < len; i++) { bytes[i] = binaryString.charCodeAt(i); }
   return bytes;
 }
-
-async function decodeAudioData(
-  data: Uint8Array,
-  ctx: AudioContext,
-  sampleRate: number,
-  numChannels: number,
-): Promise<AudioBuffer> {
+async function decodeAudioData(data: Uint8Array, ctx: AudioContext, sampleRate: number, numChannels: number): Promise<AudioBuffer> {
   const dataInt16 = new Int16Array(data.buffer);
   const frameCount = dataInt16.length / numChannels;
   const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
-
   for (let channel = 0; channel < numChannels; channel++) {
     const channelData = buffer.getChannelData(channel);
-    for (let i = 0; i < frameCount; i++) {
-      channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
-    }
+    for (let i = 0; i < frameCount; i++) { channelData[i] = dataInt16[i * numChannels + channel] / 32768.0; }
   }
   return buffer;
 }
