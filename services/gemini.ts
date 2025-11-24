@@ -2,16 +2,53 @@ import { GoogleGenAI, Modality } from "@google/genai";
 
 // Safe API Key retrieval for various environments
 const getApiKey = () => {
+  let key = '';
   try {
-    return process.env.API_KEY || '';
+    // @ts-ignore
+    key = process.env.API_KEY || '';
   } catch (e) {
-    console.warn("process.env is not defined");
-    return '';
+    console.warn("process.env access failed");
   }
+  return key;
 };
 
 const apiKey = getApiKey();
 const ai = new GoogleGenAI({ apiKey });
+
+// --- Helper: Parse Google API Errors ---
+const parseGenAIError = (error: any): string => {
+  let message = error.message || "Unknown error";
+  
+  // Often the error message is a raw JSON string. Let's try to parse it.
+  if (typeof message === 'string' && (message.includes('{') || message.includes('['))) {
+    try {
+      // Regex to extract the JSON object from the error string
+      const jsonMatch = message.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const errorObj = JSON.parse(jsonMatch[0]);
+        // Google API Standard Error Format
+        if (errorObj.error && errorObj.error.message) {
+          message = errorObj.error.message;
+        }
+      }
+    } catch (e) {
+      // If parsing fails, use the original string
+    }
+  }
+
+  // User-friendly mapping
+  if (message.includes('API key not valid') || message.includes('API key is invalid')) {
+    return "Access Denied: Invalid API Key.\n\nTroubleshooting:\n1. If you just added the key, RESTART your dev server or REDEPLOY.\n2. Check for extra spaces in the key.\n3. Verify the key is active in Google AI Studio.";
+  }
+  if (message.includes('403') || message.includes('permission denied')) {
+    return "Access Denied: Your API Key does not have permission for this model.\n\nEnsure your key is from a project with Gemini API enabled.";
+  }
+  if (message.includes('503') || message.includes('overloaded')) {
+    return "Server Busy: The AI model is currently overloaded. Please try again in a moment.";
+  }
+
+  return message;
+};
 
 // --- Text Utilities ---
 
@@ -44,7 +81,7 @@ export const cleanMarkdown = (text: string): string => {
 
 export const searchBible = async (query: string): Promise<string> => {
   if (!apiKey) {
-    return "Configuration Error: API Key is missing.\n\nIF YOU ARE ON VERCEL:\n1. Go to Project Settings > Environment Variables.\n2. Add 'API_KEY' with your Google AI Studio key.\n3. Redeploy the app.";
+    return "Configuration Error: API Key is missing.\n\nIF YOU ARE ON VERCEL:\n1. Go to Project Settings > Environment Variables.\n2. Add 'API_KEY'.\n3. REDEPLOY the app (the key is baked in at build time).";
   }
   try {
     const response = await ai.models.generateContent({
@@ -65,7 +102,6 @@ export const searchBible = async (query: string): Promise<string> => {
       Refusal Strategy:
       - Humbly explain that you are designed exclusively to provide answers based on the Holy Bible and Christian faith.
       - Translate this refusal into the language requested by the user in the query.
-      - Example (English): "With all humility, I must share that I am designed exclusively to provide answers based on the Holy Bible and Christian faith. I cannot assist with other topics."
 
       If the query is Biblical:
       PROVIDE A VERY DETAILED, LENGTHY, AND COMPREHENSIVE ANSWER.
@@ -81,7 +117,7 @@ export const searchBible = async (query: string): Promise<string> => {
     return response.text || "No answer found in the Bible.";
   } catch (error: any) {
     console.error("Bible Search Error:", error);
-    return `Error: ${error.message || "Unknown error"}. \n\nPlease check your API Key and internet connection.`;
+    return `Error: ${parseGenAIError(error)}`;
   }
 };
 
@@ -91,7 +127,7 @@ interface SermonOptions {
 }
 
 export const generateSermon = async (topic: string, options: SermonOptions): Promise<string> => {
-  if (!apiKey) return "Configuration Error: API Key is missing. Please check Vercel Settings.";
+  if (!apiKey) return "Configuration Error: API Key is missing. Please check settings and redeploy.";
   
   const { audience, includeDeepContext } = options;
   
@@ -142,12 +178,12 @@ export const generateSermon = async (topic: string, options: SermonOptions): Pro
     return response.text || "Could not generate sermon.";
   } catch (error: any) {
     console.error("Sermon Gen Error:", error);
-    return `Error: ${error.message}. Please try again.`;
+    return `Error: ${parseGenAIError(error)}`;
   }
 };
 
 export const getMissionaryBioWithMaps = async (name: string) => {
-  if (!apiKey) return { text: "Configuration Error: API Key is missing. Please check Vercel Settings.", locations: [] };
+  if (!apiKey) return { text: "Configuration Error: API Key is missing. Please check settings and redeploy.", locations: [] };
 
   try {
     const response = await ai.models.generateContent({
@@ -199,7 +235,7 @@ export const getMissionaryBioWithMaps = async (name: string) => {
   } catch (error: any) {
     console.error("Bio Error:", error);
     return { 
-      text: `I am having trouble connecting to the archives right now (Error: ${error.message}). Please ensure your API Key allows Maps Grounding and try again.`, 
+      text: `Error: ${parseGenAIError(error)}`, 
       locations: [] 
     };
   }
@@ -243,7 +279,10 @@ function writeString(view: DataView, offset: number, string: string) {
 }
 
 export const speakText = async (text: string): Promise<string | null> => {
-  if (!apiKey) return null;
+  if (!apiKey) {
+    console.error("TTS: API Key Missing");
+    return null;
+  }
   try {
     const cleanText = text.replace(/[*#_`]/g, '').replace(/\[.*?\]/g, ''); 
     // Truncate to avoid model errors if text is extremely long, 
@@ -280,7 +319,7 @@ export const connectLiveSession = async (
   onAudioData: (buffer: AudioBuffer) => void,
   onClose: () => void
 ) => {
-  if (!apiKey) throw new Error("API Key Missing");
+  if (!apiKey) throw new Error("API Key Missing. Please check Vercel Settings and Redeploy.");
 
   const inputAudioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
   const outputAudioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
