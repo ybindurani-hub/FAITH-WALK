@@ -9,12 +9,18 @@ const AudioCompanion: React.FC<AudioCompanionProps> = ({ language }) => {
   const [visualData, setVisualData] = useState<number>(0); 
   // 0 = Unknown, 1 = Poor, 2 = Good, 3 = Excellent
   const [networkQuality, setNetworkQuality] = useState<number>(0); 
+  
+  // Refs for audio scheduling and network tracking inside callbacks
   const sessionRef = useRef<{ close: () => Promise<void>, outputCtx: AudioContext } | null>(null);
   const nextStartTime = useRef<number>(0);
   const sourcesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const lastChunkTimeRef = useRef<number>(0);
+  const networkQualityRef = useRef<number>(0); // Ref to access quality inside audio callback
+
+  // Sync state to ref for callback access
+  useEffect(() => { networkQualityRef.current = networkQuality; }, [networkQuality]);
 
   useEffect(() => {
     const updateVisuals = () => {
@@ -52,13 +58,13 @@ const AudioCompanion: React.FC<AudioCompanionProps> = ({ language }) => {
             if (!sessionRef.current) return;
             const ctx = sessionRef.current.outputCtx;
             
-            // Network Quality Heuristic based on chunk arrival intervals
+            // 1. Network Quality Heuristic
             const now = Date.now();
             if (lastChunkTimeRef.current > 0) {
                 const diff = now - lastChunkTimeRef.current;
-                // If chunks arrive > 500ms apart, network is struggling
-                if (diff > 500) setNetworkQuality(1); 
-                else if (diff > 200) setNetworkQuality(2);
+                // If chunks arrive > 400ms apart, network is struggling
+                if (diff > 400) setNetworkQuality(1); 
+                else if (diff > 150) setNetworkQuality(2);
                 else setNetworkQuality(3);
             }
             lastChunkTimeRef.current = now;
@@ -70,11 +76,19 @@ const AudioCompanion: React.FC<AudioCompanionProps> = ({ language }) => {
               analyserRef.current = analyser;
             }
 
-            // SMART JITTER BUFFER
-            // If the buffer runs dry (nextStartTime < ctx.currentTime), it means lag occurred.
-            // Instead of playing immediately (which causes robotic stutter), we add a small safety buffer (0.1s).
-            if (nextStartTime.current < ctx.currentTime) {
-                nextStartTime.current = ctx.currentTime + 0.1; 
+            // 2. SMART JITTER BUFFER (The Fix for "Stuck" Audio)
+            const audioCtxTime = ctx.currentTime;
+            
+            // If the schedule is in the past, we have "underrun" (ran out of audio).
+            // This causes the stutter.
+            if (nextStartTime.current < audioCtxTime) {
+                // Determine how much to pre-buffer based on network quality.
+                // Poor network = longer wait (0.3s) to build up chunks.
+                // Good network = short wait (0.1s) for low latency.
+                const bufferSafety = networkQualityRef.current <= 1 ? 0.3 : 0.1;
+                
+                // Reset the play cursor to Now + Safety Buffer
+                nextStartTime.current = audioCtxTime + bufferSafety;
             }
 
             const source = ctx.createBufferSource();

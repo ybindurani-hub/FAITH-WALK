@@ -56,7 +56,7 @@ const parseGenAIError = (error: any): string => {
   }
 
   const lowerMsg = message.toLowerCase();
-
+  
   // Handle Specific Key Issues
   if (lowerMsg.includes('leaked') || lowerMsg.includes('revoked')) {
     return "KEY_LEAKED";
@@ -346,10 +346,11 @@ export const connectLiveSession = async (
         processor.onaudioprocess = (e) => {
           const inputData = e.inputBuffer.getChannelData(0);
           
-          // Optimization: Skip empty frames to save bandwidth on slow networks
+          // Optimization: Efficient silence detection
           let hasSignal = false;
-          for(let i=0; i<inputData.length; i+=100) {
-              if (Math.abs(inputData[i]) > 0.01) { hasSignal = true; break; }
+          // Check strided samples to save CPU
+          for(let i=0; i<inputData.length; i+=50) {
+              if (Math.abs(inputData[i]) > 0.02) { hasSignal = true; break; }
           }
           if (!hasSignal) return; 
 
