@@ -1,0 +1,8 @@
+{
+  "name": "FaithWalk AI",
+  "description": "A comprehensive spiritual companion app featuring Bible search, sermon building, missionary biographies with maps, and a real-time voice counselor.",
+  "requestFramePermissions": [
+    "microphone",
+    "geolocation"
+  ]
+}
