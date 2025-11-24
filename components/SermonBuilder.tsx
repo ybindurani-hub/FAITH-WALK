@@ -79,14 +79,13 @@ const SermonBuilder: React.FC<SermonBuilderProps> = ({ language }) => {
     }
     
     setIsAudioLoading(true);
-    const url = await speakText(sermon);
-    setIsAudioLoading(false);
-
-    if (url) {
+    try {
+      const url = await speakText(sermon);
       setAudioUrl(url);
-      setTimeout(() => {
-        if(audioRef.current) audioRef.current.play();
-      }, 100);
+    } catch (e: any) {
+      alert(e.message);
+    } finally {
+      setIsAudioLoading(false);
     }
   };
 
@@ -189,6 +188,7 @@ const SermonBuilder: React.FC<SermonBuilderProps> = ({ language }) => {
                        <audio 
                          ref={audioRef} 
                          src={audioUrl} 
+                         autoPlay
                          onEnded={() => setIsPlaying(false)} 
                          onPause={() => setIsPlaying(false)}
                          onPlay={() => setIsPlaying(true)}

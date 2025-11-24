@@ -49,7 +49,7 @@ const LoadingScreen: React.FC = () => {
   }, []);
 
   return (
-    <div className="absolute inset-0 z-50 bg-white/95 backdrop-blur-md flex flex-col items-center justify-center p-8 text-center animate-in fade-in duration-300">
+    <div className="absolute inset-0 z-50 bg-white/80 backdrop-blur-xl flex flex-col items-center justify-center p-8 text-center animate-in fade-in duration-300">
       <div className="mb-8 relative">
         <div className="w-16 h-16 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin"></div>
         <div className="absolute inset-0 flex items-center justify-center">
@@ -57,10 +57,10 @@ const LoadingScreen: React.FC = () => {
         </div>
       </div>
       
-      <h3 className="text-xl font-serif text-slate-400 mb-4 italic">Reflecting...</h3>
+      <h3 className="text-xl font-serif text-slate-500 mb-4 italic">Reflecting...</h3>
       
       <div className="max-w-md animate-in slide-in-from-bottom-4 duration-700">
-        <p className="text-2xl font-serif font-medium text-slate-800 leading-relaxed">
+        <p className="text-2xl font-serif font-bold text-slate-800 leading-relaxed drop-shadow-sm">
           "{quote}"
         </p>
       </div>

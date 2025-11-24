@@ -65,15 +65,13 @@ const BibleSearch: React.FC<BibleSearchProps> = ({ language }) => {
     }
     
     setIsAudioLoading(true);
-    const url = await speakText(result);
-    setIsAudioLoading(false);
-    
-    if (url) {
+    try {
+      const url = await speakText(result);
       setAudioUrl(url);
-      // Short timeout to ensure the audio tag has loaded the src
-      setTimeout(() => {
-        if(audioRef.current) audioRef.current.play();
-      }, 100);
+    } catch (e: any) {
+      alert(e.message);
+    } finally {
+      setIsAudioLoading(false);
     }
   };
 
@@ -133,6 +131,7 @@ const BibleSearch: React.FC<BibleSearchProps> = ({ language }) => {
                    <audio 
                      ref={audioRef} 
                      src={audioUrl} 
+                     autoPlay
                      onEnded={() => setIsPlaying(false)} 
                      onPause={() => setIsPlaying(false)}
                      onPlay={() => setIsPlaying(true)}

@@ -64,14 +64,13 @@ const MissionaryBio: React.FC<MissionaryBioProps> = ({ language }) => {
     }
     
     setIsAudioLoading(true);
-    const url = await speakText(bioData.text);
-    setIsAudioLoading(false);
-    
-    if (url) {
+    try {
+      const url = await speakText(bioData.text);
       setAudioUrl(url);
-      setTimeout(() => {
-        if(audioRef.current) audioRef.current.play();
-      }, 100);
+    } catch (e: any) {
+      alert(e.message);
+    } finally {
+      setIsAudioLoading(false);
     }
   };
 
@@ -147,6 +146,7 @@ const MissionaryBio: React.FC<MissionaryBioProps> = ({ language }) => {
                        <audio 
                          ref={audioRef} 
                          src={audioUrl} 
+                         autoPlay
                          onEnded={() => setIsPlaying(false)} 
                          onPause={() => setIsPlaying(false)}
                          onPlay={() => setIsPlaying(true)}

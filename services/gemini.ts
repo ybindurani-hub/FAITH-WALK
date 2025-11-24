@@ -37,8 +37,8 @@ const parseGenAIError = (error: any): string => {
   }
 
   // User-friendly mapping
-  if (message.includes('API key not valid') || message.includes('API key is invalid')) {
-    return "Access Denied: Invalid API Key.\n\nTroubleshooting:\n1. If you just added the key, RESTART your dev server or REDEPLOY.\n2. Check for extra spaces in the key.\n3. Verify the key is active in Google AI Studio.";
+  if (message.includes('API key not valid') || message.includes('API key is invalid') || message.includes('API_KEY_INVALID')) {
+    return "Access Denied: Invalid API Key.\n\nFOR VERCEL USERS:\n1. Go to Project Settings > Environment Variables.\n2. Add 'API_KEY' with your Google AI Studio key.\n3. Redeploy the app.";
   }
   if (message.includes('403') || message.includes('permission denied')) {
     return "Access Denied: Your API Key does not have permission for this model.\n\nEnsure your key is from a project with Gemini API enabled.";
@@ -69,9 +69,8 @@ export const cleanMarkdown = (text: string): string => {
     .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
     // Remove blockquotes
     .replace(/^\s*>\s/gm, '')
-    // Clean up bullets
-    .replace(/^\s*-\s/gm, '')
-    .replace(/^\s*\+\s/gm, '')
+    // Clean up bullets but keep structure
+    .replace(/^\s*[-+*]\s/gm, '')
     // Fix spacing
     .replace(/\n\s*\n/g, '\n\n')
     .trim();
@@ -81,7 +80,7 @@ export const cleanMarkdown = (text: string): string => {
 
 export const searchBible = async (query: string): Promise<string> => {
   if (!apiKey) {
-    return "Configuration Error: API Key is missing.\n\nIF YOU ARE ON VERCEL:\n1. Go to Project Settings > Environment Variables.\n2. Add 'API_KEY'.\n3. REDEPLOY the app (the key is baked in at build time).";
+    return "Configuration Error: API Key is missing.\n\nPlease check your Vercel Environment Variables and Redeploy.";
   }
   try {
     const response = await ai.models.generateContent({
@@ -278,17 +277,16 @@ function writeString(view: DataView, offset: number, string: string) {
   }
 }
 
-export const speakText = async (text: string): Promise<string | null> => {
+export const speakText = async (text: string): Promise<string> => {
   if (!apiKey) {
-    console.error("TTS: API Key Missing");
-    return null;
+    throw new Error("API Key Missing. Check Vercel Settings.");
   }
-  try {
-    const cleanText = text.replace(/[*#_`]/g, '').replace(/\[.*?\]/g, ''); 
-    // Truncate to avoid model errors if text is extremely long, 
-    // though 4000 is usually safe for TTS per request.
-    const safeText = cleanText.substring(0, 4000);
+  
+  // Clean text and truncate to avoid token limits on the TTS model
+  const cleanText = text.replace(/[*#_`]/g, '').replace(/\[.*?\]/g, ''); 
+  const safeText = cleanText.substring(0, 4000); // 4000 char limit
 
+  try {
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash-preview-tts",
       contents: [{ parts: [{ text: safeText }] }],
@@ -303,12 +301,15 @@ export const speakText = async (text: string): Promise<string | null> => {
     });
 
     const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-    if (!base64Audio) return null;
+    if (!base64Audio) {
+      throw new Error("No audio generated from model.");
+    }
 
     return base64ToWav(base64Audio);
-  } catch (e) {
+  } catch (e: any) {
     console.error("TTS Error", e);
-    return null;
+    const msg = parseGenAIError(e);
+    throw new Error(msg);
   }
 };
 
@@ -351,6 +352,7 @@ export const connectLiveSession = async (
           });
         };
         
+        // Mute input to prevent feedback
         const muteNode = inputAudioContext.createGain();
         muteNode.gain.value = 0;
         
