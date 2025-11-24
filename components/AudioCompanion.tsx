@@ -7,11 +7,14 @@ const AudioCompanion: React.FC<AudioCompanionProps> = ({ language }) => {
   const [isActive, setIsActive] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [visualData, setVisualData] = useState<number>(0); 
+  // 0 = Unknown, 1 = Poor, 2 = Good, 3 = Excellent
+  const [networkQuality, setNetworkQuality] = useState<number>(0); 
   const sessionRef = useRef<{ close: () => Promise<void>, outputCtx: AudioContext } | null>(null);
   const nextStartTime = useRef<number>(0);
   const sourcesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animationFrameRef = useRef<number | null>(null);
+  const lastChunkTimeRef = useRef<number>(0);
 
   useEffect(() => {
     const updateVisuals = () => {
@@ -36,6 +39,7 @@ const AudioCompanion: React.FC<AudioCompanionProps> = ({ language }) => {
       nextStartTime.current = 0;
       analyserRef.current = null;
       setIsActive(false);
+      setNetworkQuality(0);
     } else {
       setError(null);
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -47,13 +51,32 @@ const AudioCompanion: React.FC<AudioCompanionProps> = ({ language }) => {
           (audioBuffer) => {
             if (!sessionRef.current) return;
             const ctx = sessionRef.current.outputCtx;
+            
+            // Network Quality Heuristic based on chunk arrival intervals
+            const now = Date.now();
+            if (lastChunkTimeRef.current > 0) {
+                const diff = now - lastChunkTimeRef.current;
+                // If chunks arrive > 500ms apart, network is struggling
+                if (diff > 500) setNetworkQuality(1); 
+                else if (diff > 200) setNetworkQuality(2);
+                else setNetworkQuality(3);
+            }
+            lastChunkTimeRef.current = now;
+
             if (!analyserRef.current) {
               const analyser = ctx.createAnalyser();
               analyser.fftSize = 256; analyser.smoothingTimeConstant = 0.5;
               analyser.connect(ctx.destination);
               analyserRef.current = analyser;
             }
-            nextStartTime.current = Math.max(nextStartTime.current, ctx.currentTime);
+
+            // SMART JITTER BUFFER
+            // If the buffer runs dry (nextStartTime < ctx.currentTime), it means lag occurred.
+            // Instead of playing immediately (which causes robotic stutter), we add a small safety buffer (0.1s).
+            if (nextStartTime.current < ctx.currentTime) {
+                nextStartTime.current = ctx.currentTime + 0.1; 
+            }
+
             const source = ctx.createBufferSource();
             source.buffer = audioBuffer;
             source.connect(analyserRef.current);
@@ -66,6 +89,8 @@ const AudioCompanion: React.FC<AudioCompanionProps> = ({ language }) => {
         );
         sessionRef.current = session;
         setIsActive(true);
+        setNetworkQuality(3); // Assume good start
+        lastChunkTimeRef.current = Date.now();
       } catch (e: any) {
         if (e.message === "MIC_PERMISSION_DENIED") {
            setError("Microphone Access Denied. Please enable microphone permissions in your Device Settings.");
@@ -73,8 +98,10 @@ const AudioCompanion: React.FC<AudioCompanionProps> = ({ language }) => {
            setError("API Key Missing. Please set it in Settings.");
         } else if (e.message === "KEY_LEAKED") {
             setError("Security Alert: Your API Key was disabled by Google. Please generate a new one.");
+        } else if (e.message === "KEY_EXPIRED") {
+            setError("API Key Expired. Please renew your key in Google AI Studio.");
         } else {
-           setError("Connection Failed. Check internet.");
+           setError(`Connection Failed: ${e.message}`);
         }
       }
     }
@@ -95,7 +122,18 @@ const AudioCompanion: React.FC<AudioCompanionProps> = ({ language }) => {
            <h2 className="text-xl font-serif font-bold text-white tracking-wide">Live Counselor</h2>
            <p className="text-xs text-indigo-200 uppercase tracking-widest font-semibold">{language.split('-')[0]} • {isActive ? "Connected" : "Ready"}</p>
         </div>
-        <div className={`w-3 h-3 rounded-full ${isActive ? 'bg-green-400 shadow-[0_0_10px_#4ade80]' : 'bg-slate-600'}`}></div>
+        
+        <div className="flex items-center gap-3">
+             {/* Network Indicator */}
+             {isActive && (
+                 <div className="flex items-end gap-0.5 h-3" title="Connection Quality">
+                     <div className={`w-1 rounded-sm transition-all duration-300 ${networkQuality >= 1 ? (networkQuality === 1 ? 'bg-red-500 h-1.5' : (networkQuality === 2 ? 'bg-yellow-400 h-1.5' : 'bg-green-400 h-1.5')) : 'bg-slate-700 h-1.5'}`}></div>
+                     <div className={`w-1 rounded-sm transition-all duration-300 ${networkQuality >= 2 ? (networkQuality === 2 ? 'bg-yellow-400 h-2' : 'bg-green-400 h-2') : 'bg-slate-700 h-2'}`}></div>
+                     <div className={`w-1 rounded-sm transition-all duration-300 ${networkQuality >= 3 ? 'bg-green-400 h-3' : 'bg-slate-700 h-3'}`}></div>
+                 </div>
+             )}
+            <div className={`w-3 h-3 rounded-full ${isActive ? 'bg-green-400 shadow-[0_0_10px_#4ade80]' : 'bg-slate-600'}`}></div>
+        </div>
       </div>
 
       <div className="flex-1 flex flex-col items-center justify-center relative z-10 min-h-0">

@@ -1,9 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { View } from './types';
-import BibleSearch from './components/BibleSearch';
-import MissionaryBio from './components/MissionaryBio';
-import SermonBuilder from './components/SermonBuilder';
-import AudioCompanion from './components/AudioCompanion';
+import LoadingScreen from './components/LoadingScreen';
+
+// Lazy load components to drastically improve startup speed on low internet
+const BibleSearch = lazy(() => import('./components/BibleSearch'));
+const MissionaryBio = lazy(() => import('./components/MissionaryBio'));
+const SermonBuilder = lazy(() => import('./components/SermonBuilder'));
+const AudioCompanion = lazy(() => import('./components/AudioCompanion'));
 
 // 100+ Languages sorted
 const LANGUAGES = [
@@ -106,18 +109,12 @@ const App: React.FC = () => {
       </header>
 
       <main className="flex-1 overflow-hidden relative w-full min-h-0">
-        <div className={`w-full h-full ${currentView === View.BIBLE_SEARCH ? 'block' : 'hidden'}`}>
-          <BibleSearch language={language} />
-        </div>
-        <div className={`w-full h-full ${currentView === View.MISSIONARY ? 'block' : 'hidden'}`}>
-            <MissionaryBio language={language} />
-        </div>
-        <div className={`w-full h-full ${currentView === View.SERMON ? 'block' : 'hidden'}`}>
-            <SermonBuilder language={language} />
-        </div>
-        <div className={`w-full h-full ${currentView === View.AUDIO_COMPANION ? 'block' : 'hidden'}`}>
-            <AudioCompanion language={language} />
-        </div>
+        <Suspense fallback={<LoadingScreen />}>
+          {currentView === View.BIBLE_SEARCH && <BibleSearch language={language} />}
+          {currentView === View.MISSIONARY && <MissionaryBio language={language} />}
+          {currentView === View.SERMON && <SermonBuilder language={language} />}
+          {currentView === View.AUDIO_COMPANION && <AudioCompanion language={language} />}
+        </Suspense>
       </main>
 
       <nav className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-lg border-t border-slate-200 dark:border-slate-800 pb-safe z-40 shrink-0 transition-colors">

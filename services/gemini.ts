@@ -55,14 +55,19 @@ const parseGenAIError = (error: any): string => {
     } catch (e) {}
   }
 
-  // Handle Leaked Key specifically
-  if (message.toLowerCase().includes('leaked') || message.toLowerCase().includes('revoked')) {
+  const lowerMsg = message.toLowerCase();
+
+  // Handle Specific Key Issues
+  if (lowerMsg.includes('leaked') || lowerMsg.includes('revoked')) {
     return "KEY_LEAKED";
   }
-
+  if (lowerMsg.includes('expired')) {
+    return "KEY_EXPIRED";
+  }
   if (message.includes('API key not valid') || message.includes('API_KEY_INVALID')) {
     return "INVALID_KEY";
   }
+  
   return message;
 };
 
@@ -105,6 +110,7 @@ export const searchBible = async (query: string): Promise<string> => {
     const msg = parseGenAIError(error);
     if (msg === 'INVALID_KEY') return "INVALID_KEY";
     if (msg === 'KEY_LEAKED') return "KEY_LEAKED";
+    if (msg === 'KEY_EXPIRED') return "KEY_EXPIRED";
     return `Error: ${msg}`;
   }
 };
@@ -141,6 +147,7 @@ export const generateSermon = async (topic: string, options: SermonOptions): Pro
     const msg = parseGenAIError(error);
     if (msg === 'INVALID_KEY') return "INVALID_KEY";
     if (msg === 'KEY_LEAKED') return "KEY_LEAKED";
+    if (msg === 'KEY_EXPIRED') return "KEY_EXPIRED";
     return `Error: ${msg}`;
   }
 };
@@ -190,6 +197,7 @@ export const getMissionaryBioWithMaps = async (name: string) => {
     const msg = parseGenAIError(error);
     if (msg === 'INVALID_KEY') return { text: "INVALID_KEY", locations: [] };
     if (msg === 'KEY_LEAKED') return { text: "KEY_LEAKED", locations: [] };
+    if (msg === 'KEY_EXPIRED') return { text: "KEY_EXPIRED", locations: [] };
     return { text: `Error: ${msg}`, locations: [] };
   }
 };
@@ -256,6 +264,7 @@ export const speakText = async (text: string): Promise<string> => {
     const msg = parseGenAIError(e);
     if (msg === 'INVALID_KEY') throw new Error("INVALID_KEY");
     if (msg === 'KEY_LEAKED') throw new Error("KEY_LEAKED");
+    if (msg === 'KEY_EXPIRED') throw new Error("KEY_EXPIRED");
     throw new Error(msg);
   }
 };
@@ -336,6 +345,14 @@ export const connectLiveSession = async (
         
         processor.onaudioprocess = (e) => {
           const inputData = e.inputBuffer.getChannelData(0);
+          
+          // Optimization: Skip empty frames to save bandwidth on slow networks
+          let hasSignal = false;
+          for(let i=0; i<inputData.length; i+=100) {
+              if (Math.abs(inputData[i]) > 0.01) { hasSignal = true; break; }
+          }
+          if (!hasSignal) return; 
+
           // Manually downsample to 16kHz
           const pcm16k = downsampleTo16k(inputData, inputAudioContext.sampleRate);
           
@@ -394,6 +411,22 @@ export const connectLiveSession = async (
       }
     }
   });
+
+  // CRITICAL FIX: Await connection to catch errors like KEY_EXPIRED or INVALID_KEY immediately
+  try {
+    await sessionPromise;
+  } catch (e: any) {
+    try { stream.getTracks().forEach(t => t.stop()); } catch(cleanupErr){}
+    try { inputAudioContext.close(); } catch(cleanupErr){}
+    try { outputAudioContext.close(); } catch(cleanupErr){}
+    
+    // Throw parsed error so UI can show the right message
+    const msg = parseGenAIError(e);
+    if (msg === 'KEY_EXPIRED') throw new Error("KEY_EXPIRED");
+    if (msg === 'INVALID_KEY') throw new Error("INVALID_KEY");
+    if (msg === 'KEY_LEAKED') throw new Error("KEY_LEAKED");
+    throw e;
+  }
 
   return {
     close: async () => {

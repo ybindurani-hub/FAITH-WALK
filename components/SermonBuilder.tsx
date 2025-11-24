@@ -34,6 +34,8 @@ const SermonBuilder: React.FC<SermonBuilderProps> = ({ language }) => {
         setSermon("API Key Missing or Invalid. Please check your environment variables.");
       } else if (result === "KEY_LEAKED") {
         setSermon("SECURITY ALERT: Your Google API Key was disabled because it was leaked online. Please generate a new key at aistudio.google.com and update your project.");
+      } else if (result === "KEY_EXPIRED") {
+        setSermon("API KEY EXPIRED: Your Google API Key is no longer valid. Please generate a new key at aistudio.google.com.");
       } else {
         setSermon(result);
       }
@@ -68,6 +70,7 @@ const SermonBuilder: React.FC<SermonBuilderProps> = ({ language }) => {
       setAudioUrl(url);
     } catch (e: any) { 
         if (e.message === "KEY_LEAKED") alert("Cannot generate audio: API Key Leaked/Revoked.");
+        else if (e.message === "KEY_EXPIRED") alert("Cannot generate audio: API Key Expired.");
         else alert(e.message); 
     } finally { setIsAudioLoading(false); }
   };

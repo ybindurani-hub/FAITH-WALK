@@ -28,6 +28,8 @@ const MissionaryBio: React.FC<MissionaryBioProps> = ({ language }) => {
         setBioData({ text: "API Key Error. Please ensure your environment is configured correctly.", locations: [] });
       } else if (data.text === "KEY_LEAKED") {
         setBioData({ text: "SECURITY ALERT: Your Google API Key was disabled because it was leaked online. Please generate a new key at aistudio.google.com and update your project.", locations: [] });
+      } else if (data.text === "KEY_EXPIRED") {
+        setBioData({ text: "API KEY EXPIRED: Your Google API Key is no longer valid. Please generate a new key at aistudio.google.com.", locations: [] });
       } else {
         setBioData(data);
       }
@@ -64,6 +66,7 @@ const MissionaryBio: React.FC<MissionaryBioProps> = ({ language }) => {
       setAudioUrl(url);
     } catch (e: any) {
       if (e.message === "KEY_LEAKED") alert("Cannot generate audio: API Key Leaked/Revoked.");
+      else if (e.message === "KEY_EXPIRED") alert("Cannot generate audio: API Key Expired.");
       else alert(e.message === "MISSING_KEY" ? "API Key Missing." : e.message);
     } finally {
       setIsAudioLoading(false);

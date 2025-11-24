@@ -28,6 +28,8 @@ const BibleSearch: React.FC<BibleSearchProps> = ({ language }) => {
         setResult("API Key Issue: Please ensure your environment is configured correctly.");
       } else if (text === "KEY_LEAKED") {
         setResult("SECURITY ALERT: Your Google API Key was disabled because it was leaked online. Please generate a new key at aistudio.google.com and update your project.");
+      } else if (text === "KEY_EXPIRED") {
+        setResult("API KEY EXPIRED: Your Google API Key is no longer valid. Please generate a new key at aistudio.google.com.");
       } else {
         setResult(text);
       }
@@ -55,6 +57,7 @@ const BibleSearch: React.FC<BibleSearchProps> = ({ language }) => {
       setAudioUrl(url);
     } catch (e: any) { 
       if (e.message === "KEY_LEAKED") alert("Cannot generate audio: API Key Leaked/Revoked.");
+      else if (e.message === "KEY_EXPIRED") alert("Cannot generate audio: API Key Expired.");
       else alert(e.message); 
     } finally { setIsAudioLoading(false); }
   };
