@@ -1,6 +1,16 @@
 import { GoogleGenAI, Modality } from "@google/genai";
 
-const apiKey = process.env.API_KEY || '';
+// Safe API Key retrieval for various environments
+const getApiKey = () => {
+  try {
+    return process.env.API_KEY || '';
+  } catch (e) {
+    console.warn("process.env is not defined");
+    return '';
+  }
+};
+
+const apiKey = getApiKey();
 const ai = new GoogleGenAI({ apiKey });
 
 // --- Text Utilities ---
@@ -8,16 +18,25 @@ const ai = new GoogleGenAI({ apiKey });
 export const cleanMarkdown = (text: string): string => {
   if (!text) return "";
   return text
-    .replace(/\*\*/g, '')         // Remove bold
-    .replace(/\*/g, '')           // Remove italics/bullets
-    .replace(/###/g, '')          // Remove H3
-    .replace(/##/g, '')           // Remove H2
-    .replace(/#/g, '')            // Remove H1
-    .replace(/`/g, '')            // Remove code blocks
-    .replace(/_/g, '')            // Remove underscores
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // Remove links but keep text: [text](url) -> text
-    .replace(/^\s*-\s/gm, '• ')   // Replace dash bullets with dots
-    .replace(/\n\s*\n/g, '\n\n')  // Fix multiple newlines
+    // Remove bold/italic markers
+    .replace(/\*\*/g, '')
+    .replace(/\*/g, '')
+    .replace(/__/g, '')
+    .replace(/_/g, '')
+    // Remove headers
+    .replace(/#{1,6}\s?/g, '')
+    // Remove code blocks
+    .replace(/```[\s\S]*?```/g, '')
+    .replace(/`/g, '')
+    // Remove links [text](url) -> text
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    // Remove blockquotes
+    .replace(/^\s*>\s/gm, '')
+    // Clean up bullets
+    .replace(/^\s*-\s/gm, '')
+    .replace(/^\s*\+\s/gm, '')
+    // Fix spacing
+    .replace(/\n\s*\n/g, '\n\n')
     .trim();
 };
 
@@ -25,7 +44,7 @@ export const cleanMarkdown = (text: string): string => {
 
 export const searchBible = async (query: string): Promise<string> => {
   if (!apiKey) {
-    return "Configuration Error: API Key is missing. Please check your Vercel Environment Variables.";
+    return "Configuration Error: API Key is missing.\n\nIF YOU ARE ON VERCEL:\n1. Go to Project Settings > Environment Variables.\n2. Add 'API_KEY' with your Google AI Studio key.\n3. Redeploy the app.";
   }
   try {
     const response = await ai.models.generateContent({
@@ -56,13 +75,13 @@ export const searchBible = async (query: string): Promise<string> => {
       If quoting, provide the Book, Chapter, and Verse. 
       Format the output with clear paragraphs.`,
       config: {
-        maxOutputTokens: 8192, // Ensure full length responses
+        maxOutputTokens: 8192,
       }
     });
     return response.text || "No answer found in the Bible.";
   } catch (error: any) {
     console.error("Bible Search Error:", error);
-    return `Error: ${error.message || "Unknown error occurred"}. Please check your connection and API Key.`;
+    return `Error: ${error.message || "Unknown error"}. \n\nPlease check your API Key and internet connection.`;
   }
 };
 
@@ -72,7 +91,7 @@ interface SermonOptions {
 }
 
 export const generateSermon = async (topic: string, options: SermonOptions): Promise<string> => {
-  if (!apiKey) return "Configuration Error: API Key is missing.";
+  if (!apiKey) return "Configuration Error: API Key is missing. Please check Vercel Settings.";
   
   const { audience, includeDeepContext } = options;
   
@@ -117,7 +136,7 @@ export const generateSermon = async (topic: string, options: SermonOptions): Pro
       model: 'gemini-3-pro-preview', 
       contents: prompt,
       config: {
-        maxOutputTokens: 8192, // Ensure sermon is complete
+        maxOutputTokens: 8192,
       }
     });
     return response.text || "Could not generate sermon.";
@@ -128,11 +147,9 @@ export const generateSermon = async (topic: string, options: SermonOptions): Pro
 };
 
 export const getMissionaryBioWithMaps = async (name: string) => {
-  if (!apiKey) return { text: "Configuration Error: API Key is missing.", locations: [] };
+  if (!apiKey) return { text: "Configuration Error: API Key is missing. Please check Vercel Settings.", locations: [] };
 
   try {
-    // Using Maps Grounding to find locations relevant to the missionary
-    // Softened prompt to prevent "I cannot help" errors on obscure names
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: `Write a COMPLETE, EXTENSIVE, and DETAILED biography of Christian missionary ${name}. 
@@ -181,7 +198,6 @@ export const getMissionaryBioWithMaps = async (name: string) => {
     return { text, locations };
   } catch (error: any) {
     console.error("Bio Error:", error);
-    // Fallback response instead of crashing
     return { 
       text: `I am having trouble connecting to the archives right now (Error: ${error.message}). Please ensure your API Key allows Maps Grounding and try again.`, 
       locations: [] 
@@ -197,34 +213,20 @@ function base64ToWav(base64: string): string {
   const buffer = new ArrayBuffer(44 + len);
   const view = new DataView(buffer);
   
-  // RIFF identifier
   writeString(view, 0, 'RIFF');
-  // RIFF chunk length
   view.setUint32(4, 36 + len, true);
-  // RIFF type
   writeString(view, 8, 'WAVE');
-  // format chunk identifier
   writeString(view, 12, 'fmt ');
-  // format chunk length
   view.setUint32(16, 16, true);
-  // sample format (1 = PCM)
   view.setUint16(20, 1, true);
-  // channel count (1 = mono)
   view.setUint16(22, 1, true);
-  // sample rate
   view.setUint32(24, 24000, true);
-  // byte rate (sample rate * block align)
   view.setUint32(28, 24000 * 2, true);
-  // block align (channel count * bytes per sample)
   view.setUint16(32, 2, true);
-  // bits per sample
   view.setUint16(34, 16, true);
-  // data chunk identifier
   writeString(view, 36, 'data');
-  // data chunk length
   view.setUint32(40, len, true);
   
-  // Write PCM data
   const bytes = new Uint8Array(buffer, 44);
   for (let i = 0; i < len; i++) {
     bytes[i] = binaryString.charCodeAt(i);
@@ -243,17 +245,19 @@ function writeString(view: DataView, offset: number, string: string) {
 export const speakText = async (text: string): Promise<string | null> => {
   if (!apiKey) return null;
   try {
-    // Helper to strip markdown for cleaner speech
     const cleanText = text.replace(/[*#_`]/g, '').replace(/\[.*?\]/g, ''); 
-    
+    // Truncate to avoid model errors if text is extremely long, 
+    // though 4000 is usually safe for TTS per request.
+    const safeText = cleanText.substring(0, 4000);
+
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash-preview-tts",
-      contents: [{ parts: [{ text: cleanText.substring(0, 4000) }] }], // Increased limit
+      contents: [{ parts: [{ text: safeText }] }],
       config: {
         responseModalities: [Modality.AUDIO],
         speechConfig: {
           voiceConfig: {
-            prebuiltVoiceConfig: { voiceName: 'Fenrir' }, // Deep, comforting voice
+            prebuiltVoiceConfig: { voiceName: 'Fenrir' },
           },
         },
       },
@@ -281,7 +285,6 @@ export const connectLiveSession = async (
   const inputAudioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
   const outputAudioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
   
-  // Resume contexts immediately in case they are suspended (browser policy)
   await inputAudioContext.resume();
   await outputAudioContext.resume();
 
@@ -309,7 +312,6 @@ export const connectLiveSession = async (
           });
         };
         
-        // Fix feedback loop: Connect to a muted gain node instead of direct destination
         const muteNode = inputAudioContext.createGain();
         muteNode.gain.value = 0;
         
@@ -373,9 +375,6 @@ export const connectLiveSession = async (
     outputCtx: outputAudioContext
   };
 };
-
-
-// --- Audio Helpers ---
 
 function createBlob(data: Float32Array) {
   const l = data.length;
