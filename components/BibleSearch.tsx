@@ -25,7 +25,9 @@ const BibleSearch: React.FC<BibleSearchProps> = ({ language }) => {
     try {
       const text = await searchBible(query + ` (Reply in ${language})`);
       if (text === "MISSING_KEY" || text === "INVALID_KEY") {
-        setResult("API Key Issue: Please set your Google Gemini API Key in Settings.");
+        setResult("API Key Issue: Please ensure your environment is configured correctly.");
+      } else if (text === "KEY_LEAKED") {
+        setResult("SECURITY ALERT: Your Google API Key was disabled because it was leaked online. Please generate a new key at aistudio.google.com and update your project.");
       } else {
         setResult(text);
       }
@@ -51,7 +53,10 @@ const BibleSearch: React.FC<BibleSearchProps> = ({ language }) => {
     try {
       const url = await speakText(result);
       setAudioUrl(url);
-    } catch (e: any) { alert(e.message); } finally { setIsAudioLoading(false); }
+    } catch (e: any) { 
+      if (e.message === "KEY_LEAKED") alert("Cannot generate audio: API Key Leaked/Revoked.");
+      else alert(e.message); 
+    } finally { setIsAudioLoading(false); }
   };
 
   const togglePlayback = () => { if (audioRef.current) isPlaying ? audioRef.current.pause() : audioRef.current.play(); };

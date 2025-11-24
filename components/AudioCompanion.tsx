@@ -71,6 +71,8 @@ const AudioCompanion: React.FC<AudioCompanionProps> = ({ language }) => {
            setError("Microphone Access Denied. Please enable microphone permissions in your Device Settings.");
         } else if (e.message === "MISSING_KEY") {
            setError("API Key Missing. Please set it in Settings.");
+        } else if (e.message === "KEY_LEAKED") {
+            setError("Security Alert: Your API Key was disabled by Google. Please generate a new one.");
         } else {
            setError("Connection Failed. Check internet.");
         }

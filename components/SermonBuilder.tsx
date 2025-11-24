@@ -31,7 +31,9 @@ const SermonBuilder: React.FC<SermonBuilderProps> = ({ language }) => {
     try {
       const result = await generateSermon(topic + ` (Write in ${language})`, { audience, includeDeepContext });
       if (result === "MISSING_KEY" || result === "INVALID_KEY") {
-        setSermon("API Key Missing or Invalid. Please use the Settings icon to set your Google Gemini Key.");
+        setSermon("API Key Missing or Invalid. Please check your environment variables.");
+      } else if (result === "KEY_LEAKED") {
+        setSermon("SECURITY ALERT: Your Google API Key was disabled because it was leaked online. Please generate a new key at aistudio.google.com and update your project.");
       } else {
         setSermon(result);
       }
@@ -64,7 +66,10 @@ const SermonBuilder: React.FC<SermonBuilderProps> = ({ language }) => {
     try {
       const url = await speakText(sermon);
       setAudioUrl(url);
-    } catch (e: any) { alert(e.message); } finally { setIsAudioLoading(false); }
+    } catch (e: any) { 
+        if (e.message === "KEY_LEAKED") alert("Cannot generate audio: API Key Leaked/Revoked.");
+        else alert(e.message); 
+    } finally { setIsAudioLoading(false); }
   };
 
   const togglePlayback = () => { if (audioRef.current) isPlaying ? audioRef.current.pause() : audioRef.current.play(); };

@@ -26,6 +26,8 @@ const MissionaryBio: React.FC<MissionaryBioProps> = ({ language }) => {
       const data = await getMissionaryBioWithMaps(name + ` (Reply in ${language})`);
       if (data.text === "MISSING_KEY" || data.text === "INVALID_KEY") {
         setBioData({ text: "API Key Error. Please ensure your environment is configured correctly.", locations: [] });
+      } else if (data.text === "KEY_LEAKED") {
+        setBioData({ text: "SECURITY ALERT: Your Google API Key was disabled because it was leaked online. Please generate a new key at aistudio.google.com and update your project.", locations: [] });
       } else {
         setBioData(data);
       }
@@ -61,7 +63,8 @@ const MissionaryBio: React.FC<MissionaryBioProps> = ({ language }) => {
       const url = await speakText(bioData.text);
       setAudioUrl(url);
     } catch (e: any) {
-      alert(e.message === "MISSING_KEY" ? "API Key Missing." : e.message);
+      if (e.message === "KEY_LEAKED") alert("Cannot generate audio: API Key Leaked/Revoked.");
+      else alert(e.message === "MISSING_KEY" ? "API Key Missing." : e.message);
     } finally {
       setIsAudioLoading(false);
     }
@@ -78,14 +81,14 @@ const MissionaryBio: React.FC<MissionaryBioProps> = ({ language }) => {
       <div className="p-4 max-w-3xl mx-auto w-full flex-1 flex flex-col min-h-0">
         <div className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/30 dark:to-orange-900/20 rounded-2xl p-8 mb-6 border border-amber-100 dark:border-amber-900/50 shadow-sm shrink-0 transition-colors">
           <h2 className="text-3xl font-serif font-bold text-amber-900 dark:text-amber-100 mb-2">Heroes of Faith</h2>
-          <p className="text-amber-800/80 dark:text-amber-200/60 text-sm mb-6">Discover the lives, miracles, and fields of service of God's generals, pastors, and revivalists.</p>
+          <p className="text-amber-800/80 dark:text-amber-200/60 text-sm mb-6">Explore the lives of God's Generals, Revivalists, and Reformers.</p>
           
           <div className="flex gap-2">
             <div className="relative flex-1 group">
               <input
                 type="text"
                 className="w-full p-4 pr-12 rounded-xl border-amber-200 dark:border-amber-800 bg-white dark:bg-slate-900 text-slate-800 dark:text-white shadow-sm focus:ring-2 focus:ring-amber-500 focus:outline-none transition-all"
-                placeholder="e.g., Smith Wigglesworth, A.A. Allen..."
+                placeholder="e.g. Smith Wigglesworth, A.A. Allen..."
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleGenerate()}

@@ -55,6 +55,11 @@ const parseGenAIError = (error: any): string => {
     } catch (e) {}
   }
 
+  // Handle Leaked Key specifically
+  if (message.toLowerCase().includes('leaked') || message.toLowerCase().includes('revoked')) {
+    return "KEY_LEAKED";
+  }
+
   if (message.includes('API key not valid') || message.includes('API_KEY_INVALID')) {
     return "INVALID_KEY";
   }
@@ -99,6 +104,7 @@ export const searchBible = async (query: string): Promise<string> => {
   } catch (error: any) {
     const msg = parseGenAIError(error);
     if (msg === 'INVALID_KEY') return "INVALID_KEY";
+    if (msg === 'KEY_LEAKED') return "KEY_LEAKED";
     return `Error: ${msg}`;
   }
 };
@@ -134,6 +140,7 @@ export const generateSermon = async (topic: string, options: SermonOptions): Pro
   } catch (error: any) {
     const msg = parseGenAIError(error);
     if (msg === 'INVALID_KEY') return "INVALID_KEY";
+    if (msg === 'KEY_LEAKED') return "KEY_LEAKED";
     return `Error: ${msg}`;
   }
 };
@@ -143,13 +150,24 @@ export const getMissionaryBioWithMaps = async (name: string) => {
   if (!getApiKey()) return { text: "MISSING_KEY", locations: [] };
 
   try {
-    // Updated prompt to include Revivalists, Reformers, and Pastors
+    // Extensive prompt for Christian Leaders
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
-      contents: `Write a DETAILED biography of ${name}, focusing on their work as a Christian Leader, Missionary, Revivalist, Reformer, or Pastor (e.g., Smith Wigglesworth, A.A. Allen, Duncan Campbell, Luther, etc.).
-      Include: Early Life, Divine Calling, Key Ministry/Revivals, Miracles/Theology, and Legacy.
-      If the name refers to a secular celebrity (actor, politician) who is NOT a Christian leader, politely refuse. 
-      If it is a Christian figure, provide a full, faith-building biography.`,
+      contents: `Write a DETAILED, EXTENSIVE biography of ${name}.
+      CONTEXT: The user is looking for Christian Leaders, Missionaries, Revivalists, Healing Evangelists, Reformers, or 'Generals of God' (e.g., Smith Wigglesworth, A.A. Allen, Duncan Campbell, William Seymour, Martin Luther, etc.).
+      
+      INSTRUCTIONS:
+      1. If the person is a secular figure (pop star, politician) with no relation to faith, polite refuse.
+      2. If the person is a Christian figure (even controversial ones like healing evangelists), provide a faith-building biography.
+      
+      INCLUDE:
+      - Early Life & Conversion
+      - The Divine Calling
+      - Key Miracles, Revivals, or Theological Contributions
+      - Struggles and Victories
+      - Legacy and Impact on the Church
+      
+      Make it lengthy and inspiring.`,
       config: {
         tools: [{ googleMaps: {} }],
         maxOutputTokens: 8192,
@@ -171,6 +189,7 @@ export const getMissionaryBioWithMaps = async (name: string) => {
   } catch (error: any) {
     const msg = parseGenAIError(error);
     if (msg === 'INVALID_KEY') return { text: "INVALID_KEY", locations: [] };
+    if (msg === 'KEY_LEAKED') return { text: "KEY_LEAKED", locations: [] };
     return { text: `Error: ${msg}`, locations: [] };
   }
 };
@@ -236,11 +255,36 @@ export const speakText = async (text: string): Promise<string> => {
   } catch (e: any) {
     const msg = parseGenAIError(e);
     if (msg === 'INVALID_KEY') throw new Error("INVALID_KEY");
+    if (msg === 'KEY_LEAKED') throw new Error("KEY_LEAKED");
     throw new Error(msg);
   }
 };
 
 // --- Live API ---
+
+// Audio Resampler: Converts arbitrary input rate (e.g. 48000) to 16000 for Gemini
+const downsampleTo16k = (buffer: Float32Array, sampleRate: number): Int16Array => {
+  if (sampleRate === 16000) {
+    const res = new Int16Array(buffer.length);
+    for (let i = 0; i < buffer.length; i++) res[i] = buffer[i] * 32768;
+    return res;
+  }
+  
+  const ratio = sampleRate / 16000;
+  const newLength = Math.round(buffer.length / ratio);
+  const result = new Int16Array(newLength);
+  
+  for (let i = 0; i < newLength; i++) {
+    const originalIndex = i * ratio;
+    const index1 = Math.floor(originalIndex);
+    const index2 = Math.min(index1 + 1, buffer.length - 1);
+    const weight = originalIndex - index1;
+    // Linear interpolation
+    const val = buffer[index1] * (1 - weight) + buffer[index2] * weight;
+    result[i] = Math.max(-1, Math.min(1, val)) * 32768;
+  }
+  return result;
+};
 
 export const connectLiveSession = async (
   onAudioData: (buffer: AudioBuffer) => void,
@@ -249,12 +293,13 @@ export const connectLiveSession = async (
   const ai = getGenAI();
   if (!getApiKey()) throw new Error("MISSING_KEY");
 
+  // Mobile-Optimized Constraints
   const constraints = {
     audio: {
-      channelCount: 1,
       echoCancellation: true,
+      noiseSuppression: true,
       autoGainControl: true,
-      noiseSuppression: true
+      channelCount: 1
     }
   };
 
@@ -266,10 +311,16 @@ export const connectLiveSession = async (
     throw new Error("MIC_PERMISSION_DENIED");
   }
 
+  // Cross-browser AudioContext
   const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-  const inputAudioContext = new AudioContextClass({ sampleRate: 16000 });
-  const outputAudioContext = new AudioContextClass({ sampleRate: 24000 });
   
+  // Input: Allow OS default sample rate (most robust on mobile)
+  const inputAudioContext = new AudioContextClass(); 
+  
+  // Output: Allow OS default sample rate
+  const outputAudioContext = new AudioContextClass();
+
+  // Resume contexts (Critical for Mobile Safari/Chrome)
   try {
     if (inputAudioContext.state === 'suspended') await inputAudioContext.resume();
     if (outputAudioContext.state === 'suspended') await outputAudioContext.resume();
@@ -280,35 +331,52 @@ export const connectLiveSession = async (
     callbacks: {
       onopen: () => {
         const source = inputAudioContext.createMediaStreamSource(stream);
-        const scriptProcessor = inputAudioContext.createScriptProcessor(4096, 1, 1);
+        // Use a larger buffer size for stability on mobile
+        const processor = inputAudioContext.createScriptProcessor(4096, 1, 1);
         
-        scriptProcessor.onaudioprocess = (audioProcessingEvent) => {
-          const inputData = audioProcessingEvent.inputBuffer.getChannelData(0);
-          const pcmBlob = createBlob(inputData);
+        processor.onaudioprocess = (e) => {
+          const inputData = e.inputBuffer.getChannelData(0);
+          // Manually downsample to 16kHz
+          const pcm16k = downsampleTo16k(inputData, inputAudioContext.sampleRate);
+          
+          // Encode to Base64
+          let binary = '';
+          const bytes = new Uint8Array(pcm16k.buffer);
+          const len = bytes.byteLength;
+          for (let i = 0; i < len; i++) binary += String.fromCharCode(bytes[i]);
+          const base64 = btoa(binary);
+
           sessionPromise.then((session) => {
-            session.sendRealtimeInput({ media: pcmBlob });
+             // Gemini expects 16kHz PCM
+             session.sendRealtimeInput({ 
+               media: { mimeType: 'audio/pcm;rate=16000', data: base64 } 
+             });
           });
         };
         
+        // Prevent feedback loop: Route processing to a muted destination
         const muteNode = inputAudioContext.createGain();
         muteNode.gain.value = 0;
-        source.connect(scriptProcessor);
-        scriptProcessor.connect(muteNode);
+        
+        source.connect(processor);
+        processor.connect(muteNode);
         muteNode.connect(inputAudioContext.destination);
       },
       onmessage: async (message: any) => {
-        const base64EncodedAudioString = message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
-        if (base64EncodedAudioString) {
+        const base64Audio = message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
+        if (base64Audio) {
           try {
-            const audioBuffer = await decodeAudioData(decode(base64EncodedAudioString), outputAudioContext, 24000, 1);
+            // Decode 24kHz audio from Gemini into the OutputContext's sample rate (usually 48k or 44.1k)
+            // The browser's decodeAudioData handles the upsampling automatically.
+            const audioBuffer = await decodeAudioData(decode(base64Audio), outputAudioContext);
             onAudioData(audioBuffer);
           } catch (e) {}
         }
       },
       onclose: () => {
-        stream.getTracks().forEach(t => t.stop());
-        inputAudioContext.close();
-        outputAudioContext.close();
+        try { stream.getTracks().forEach(t => t.stop()); } catch(e){}
+        try { inputAudioContext.close(); } catch(e){}
+        try { outputAudioContext.close(); } catch(e){}
         onClose();
       },
       onerror: (err) => {
@@ -329,25 +397,16 @@ export const connectLiveSession = async (
 
   return {
     close: async () => {
-      const session = await sessionPromise;
-      session.close();
+      try {
+        const session = await sessionPromise;
+        session.close();
+      } catch(e) {}
     },
     outputCtx: outputAudioContext
   };
 };
 
-function createBlob(data: Float32Array) {
-  const l = data.length;
-  const int16 = new Int16Array(l);
-  for (let i = 0; i < l; i++) { int16[i] = data[i] * 32768; }
-  return { data: encode(new Uint8Array(int16.buffer)), mimeType: 'audio/pcm;rate=16000' };
-}
-function encode(bytes: Uint8Array) {
-  let binary = '';
-  const len = bytes.byteLength;
-  for (let i = 0; i < len; i++) { binary += String.fromCharCode(bytes[i]); }
-  return btoa(binary);
-}
+// Utils for decoding output
 function decode(base64: string) {
   const binaryString = atob(base64);
   const len = binaryString.length;
@@ -355,13 +414,37 @@ function decode(base64: string) {
   for (let i = 0; i < len; i++) { bytes[i] = binaryString.charCodeAt(i); }
   return bytes;
 }
-async function decodeAudioData(data: Uint8Array, ctx: AudioContext, sampleRate: number, numChannels: number): Promise<AudioBuffer> {
-  const dataInt16 = new Int16Array(data.buffer);
-  const frameCount = dataInt16.length / numChannels;
-  const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
-  for (let channel = 0; channel < numChannels; channel++) {
-    const channelData = buffer.getChannelData(channel);
-    for (let i = 0; i < frameCount; i++) { channelData[i] = dataInt16[i * numChannels + channel] / 32768.0; }
-  }
-  return buffer;
+
+// Mobile-friendly decoding: Let the browser handle sample rate conversion
+async function decodeAudioData(data: Uint8Array, ctx: AudioContext): Promise<AudioBuffer> {
+    // 1. Create a "fake" WAV header for the raw PCM data so decodeAudioData accepts it
+    // Gemini output is 24kHz Mono Int16
+    const sampleRate = 24000;
+    const numChannels = 1;
+    const wavBuffer = new ArrayBuffer(44 + data.byteLength);
+    const view = new DataView(wavBuffer);
+    
+    // RIFF chunk descriptor
+    writeString(view, 0, 'RIFF');
+    view.setUint32(4, 36 + data.byteLength, true);
+    writeString(view, 8, 'WAVE');
+    // fmt sub-chunk
+    writeString(view, 12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true); // PCM
+    view.setUint16(22, numChannels, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * numChannels * 2, true);
+    view.setUint16(32, numChannels * 2, true);
+    view.setUint16(34, 16, true); // Bits per sample
+    // data sub-chunk
+    writeString(view, 36, 'data');
+    view.setUint32(40, data.byteLength, true);
+    
+    // Copy PCM data
+    const bytes = new Uint8Array(wavBuffer, 44);
+    bytes.set(data);
+
+    // 2. Decode using native browser API (Highly optimized)
+    return await ctx.decodeAudioData(wavBuffer);
 }
