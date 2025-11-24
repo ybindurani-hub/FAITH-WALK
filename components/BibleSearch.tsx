@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { searchBible, speakText, cleanMarkdown } from '../services/gemini';
+import { searchBible, speakText, cleanMarkdown, triggerSmartAd } from '../services/gemini';
 import LoadingScreen from './LoadingScreen';
 
 interface BibleSearchProps {
@@ -20,6 +20,10 @@ const BibleSearch: React.FC<BibleSearchProps> = ({ language }) => {
 
   const handleSearch = async () => {
     if (!query.trim()) return;
+    
+    // Trigger Interstitial Ad
+    triggerSmartAd();
+
     setLoading(true);
     setResult('');
     setAudioUrl(null);

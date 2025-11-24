@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { generateSermon, speakText, cleanMarkdown } from '../services/gemini';
+import { generateSermon, speakText, cleanMarkdown, triggerSmartAd } from '../services/gemini';
 import LoadingScreen from './LoadingScreen';
 
 interface SermonBuilderProps {
@@ -32,6 +32,10 @@ const SermonBuilder: React.FC<SermonBuilderProps> = ({ language }) => {
 
   const handleBuild = async () => {
     if (!topic.trim()) return;
+    
+    // Trigger Interstitial Ad
+    triggerSmartAd();
+
     setLoading(true);
     setAudioUrl(null);
     setIsPlaying(false);

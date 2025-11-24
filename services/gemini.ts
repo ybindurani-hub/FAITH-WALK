@@ -15,6 +15,27 @@ const getApiKey = () => {
 const apiKey = getApiKey();
 const ai = new GoogleGenAI({ apiKey });
 
+// --- Helper: Median.co (GoNative) Ad Trigger ---
+export const triggerSmartAd = () => {
+  if (typeof window !== 'undefined') {
+    const w = window as any;
+    // Check for Median.co (formerly GoNative) JS Bridge
+    if (w.median?.admob?.interstitial) {
+      try {
+        w.median.admob.interstitial.show();
+      } catch (e) {
+        console.log("Median Ad Trigger Failed", e);
+      }
+    } else if (w.gonative?.admob?.interstitial) {
+      try {
+        w.gonative.admob.interstitial.show();
+      } catch (e) {
+        console.log("GoNative Ad Trigger Failed", e);
+      }
+    }
+  }
+};
+
 // --- Helper: Parse Google API Errors ---
 const parseGenAIError = (error: any): string => {
   let message = error.message || "Unknown error";
@@ -168,7 +189,7 @@ export const generateSermon = async (topic: string, options: SermonOptions): Pro
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3-pro-preview', 
+      model: 'gemini-2.5-flash', // Using Standard Flash model as requested to save quota
       contents: prompt,
       config: {
         maxOutputTokens: 8192,

@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { getMissionaryBioWithMaps, speakText, cleanMarkdown } from '../services/gemini';
+import { getMissionaryBioWithMaps, speakText, cleanMarkdown, triggerSmartAd } from '../services/gemini';
 import LoadingScreen from './LoadingScreen';
 
 interface MissionaryBioProps {
@@ -19,6 +19,10 @@ const MissionaryBio: React.FC<MissionaryBioProps> = ({ language }) => {
 
   const handleGenerate = async () => {
     if (!name.trim()) return;
+    
+    // Trigger Interstitial Ad
+    triggerSmartAd();
+
     setLoading(true);
     setBioData(null);
     setAudioUrl(null);
@@ -93,21 +97,24 @@ const MissionaryBio: React.FC<MissionaryBioProps> = ({ language }) => {
           <h2 className="text-3xl font-serif font-bold text-amber-900 mb-2">Heroes of Faith</h2>
           <p className="text-amber-800/80 text-sm mb-6">Discover the lives, miracles, and fields of service of God's generals.</p>
           
-          <div className="flex gap-2 relative">
-            <input
-              type="text"
-              className="flex-1 p-4 pr-14 rounded-xl border-amber-200 border shadow-sm focus:ring-2 focus:ring-amber-500 focus:outline-none"
-              placeholder="e.g., Hudson Taylor, Amy Carmichael..."
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleGenerate()}
-            />
-             <button
-              onClick={startListening}
-              className={`absolute right-24 top-2 bottom-2 p-2 rounded-lg transition-all ${listening ? 'text-red-600 animate-pulse' : 'text-amber-400 hover:text-amber-600'}`}
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>
-            </button>
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <input
+                type="text"
+                className="w-full p-4 pr-12 rounded-xl border-amber-200 border shadow-sm focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                placeholder="e.g., Hudson Taylor, Amy Carmichael..."
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleGenerate()}
+              />
+               <button
+                onClick={startListening}
+                className={`absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-lg transition-all flex items-center justify-center ${listening ? 'text-red-600 animate-pulse' : 'text-amber-400 hover:text-amber-600'}`}
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>
+              </button>
+            </div>
+            
             <button 
               onClick={handleGenerate}
               disabled={loading}
