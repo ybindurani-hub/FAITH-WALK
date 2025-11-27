@@ -1,12 +1,14 @@
+
 import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { View } from './types';
 import LoadingScreen from './components/LoadingScreen';
 
-// Lazy load components to drastically improve startup speed on low internet
+// Lazy load components
 const BibleSearch = lazy(() => import('./components/BibleSearch'));
 const MissionaryBio = lazy(() => import('./components/MissionaryBio'));
 const SermonBuilder = lazy(() => import('./components/SermonBuilder'));
 const AudioCompanion = lazy(() => import('./components/AudioCompanion'));
+const HistoryView = lazy(() => import('./components/HistoryView'));
 
 // 100+ Languages sorted
 const LANGUAGES = [
@@ -110,10 +112,13 @@ const App: React.FC = () => {
 
       <main className="flex-1 overflow-hidden relative w-full min-h-0">
         <Suspense fallback={<LoadingScreen />}>
-          {currentView === View.BIBLE_SEARCH && <BibleSearch language={language} />}
-          {currentView === View.MISSIONARY && <MissionaryBio language={language} />}
-          {currentView === View.SERMON && <SermonBuilder language={language} />}
-          {currentView === View.AUDIO_COMPANION && <AudioCompanion language={language} />}
+          {/* Keep components mounted to preserve state (Audio/Search Results) */}
+          <div className={currentView === View.BIBLE_SEARCH ? 'block h-full' : 'hidden'}><BibleSearch language={language} /></div>
+          <div className={currentView === View.MISSIONARY ? 'block h-full' : 'hidden'}><MissionaryBio language={language} /></div>
+          <div className={currentView === View.SERMON ? 'block h-full' : 'hidden'}><SermonBuilder language={language} /></div>
+          {/* Pass isActiveView to pause visualizer animations when hidden */}
+          <div className={currentView === View.AUDIO_COMPANION ? 'block h-full' : 'hidden'}><AudioCompanion language={language} isActiveView={currentView === View.AUDIO_COMPANION} /></div>
+          <div className={currentView === View.HISTORY ? 'block h-full' : 'hidden'}><HistoryView /></div>
         </Suspense>
       </main>
 
@@ -138,6 +143,11 @@ const App: React.FC = () => {
             view={View.AUDIO_COMPANION} 
             label="Live" 
             icon={<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>} 
+          />
+           <NavButton 
+            view={View.HISTORY} 
+            label="History" 
+            icon={<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>} 
           />
         </div>
       </nav>

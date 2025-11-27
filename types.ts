@@ -1,3 +1,4 @@
+
 import { Modality } from "@google/genai";
 
 export enum View {
@@ -5,6 +6,7 @@ export enum View {
   MISSIONARY = 'MISSIONARY',
   SERMON = 'SERMON',
   AUDIO_COMPANION = 'AUDIO_COMPANION',
+  HISTORY = 'HISTORY',
 }
 
 export interface BibleResult {

@@ -1,4 +1,5 @@
 import { GoogleGenAI, Modality } from "@google/genai";
+import { saveToCache, checkCache } from './cache';
 
 // Safe API Key retrieval: LocalStorage (Legacy support) -> Vite -> React App -> Standard Node
 export const getApiKey = () => {
@@ -92,6 +93,10 @@ export const cleanMarkdown = (text: string): string => {
 // --- Services ---
 
 export const searchBible = async (query: string): Promise<string> => {
+  // 1. Check Cache
+  const cached = checkCache('BIBLE', query);
+  if (cached) return cached;
+
   const ai = getGenAI();
   if (!getApiKey()) return "MISSING_KEY";
 
@@ -105,7 +110,12 @@ export const searchBible = async (query: string): Promise<string> => {
       Format neatly.`,
       config: { maxOutputTokens: 8192 }
     });
-    return response.text || "No answer found.";
+    const text = response.text || "No answer found.";
+    
+    // 2. Save to Cache
+    if (text !== "No answer found.") saveToCache('BIBLE', query, text, 'en');
+    
+    return text;
   } catch (error: any) {
     const msg = parseGenAIError(error);
     if (msg === 'INVALID_KEY') return "INVALID_KEY";
@@ -121,6 +131,11 @@ interface SermonOptions {
 }
 
 export const generateSermon = async (topic: string, options: SermonOptions): Promise<string> => {
+  // 1. Check Cache (Use topic + options as key ideally, but simple topic for now is okay for basic cache)
+  const cacheKey = `${topic}::${options.audience}::${options.includeDeepContext}`;
+  const cached = checkCache('SERMON', cacheKey);
+  if (cached) return cached;
+
   const ai = getGenAI();
   if (!getApiKey()) return "MISSING_KEY";
   
@@ -142,7 +157,12 @@ export const generateSermon = async (topic: string, options: SermonOptions): Pro
       contents: prompt,
       config: { maxOutputTokens: 8192 }
     });
-    return response.text || "Could not generate sermon.";
+    const text = response.text || "Could not generate sermon.";
+    
+    // 2. Save Cache
+    saveToCache('SERMON', cacheKey, text, 'en');
+    
+    return text;
   } catch (error: any) {
     const msg = parseGenAIError(error);
     if (msg === 'INVALID_KEY') return "INVALID_KEY";
@@ -153,6 +173,10 @@ export const generateSermon = async (topic: string, options: SermonOptions): Pro
 };
 
 export const getMissionaryBioWithMaps = async (name: string) => {
+  // 1. Check Cache
+  const cached = checkCache('BIO', name);
+  if (cached) return cached;
+
   const ai = getGenAI();
   if (!getApiKey()) return { text: "MISSING_KEY", locations: [] };
 
@@ -192,7 +216,13 @@ export const getMissionaryBioWithMaps = async (name: string) => {
         }
       });
     }
-    return { text, locations };
+
+    const result = { text, locations };
+    
+    // 2. Save Cache
+    if (text !== "No biography found.") saveToCache('BIO', name, result, 'en');
+
+    return result;
   } catch (error: any) {
     const msg = parseGenAIError(error);
     if (msg === 'INVALID_KEY') return { text: "INVALID_KEY", locations: [] };

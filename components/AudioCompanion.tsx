@@ -3,14 +3,14 @@ import { GoogleGenAI, LiveServerMessage, Modality } from '@google/genai';
 import { createPcmBlob, decodeAudioData } from '../utils/audioUtils';
 import { getApiKey } from '../services/gemini';
 
-interface AudioCompanionProps { language: string; }
+interface AudioCompanionProps { language: string; isActiveView?: boolean; }
 
-const AudioCompanion: React.FC<AudioCompanionProps> = ({ language }) => {
+const AudioCompanion: React.FC<AudioCompanionProps> = ({ language, isActiveView = true }) => {
   const [isActive, setIsActive] = useState(false);
   const [status, setStatus] = useState<'disconnected' | 'connecting' | 'connected' | 'error'>('disconnected');
   const [errorMessage, setErrorMessage] = useState('');
   
-  // Refs for audio handling to persist across renders
+  // Audio Refs
   const inputContextRef = useRef<AudioContext | null>(null);
   const outputContextRef = useRef<AudioContext | null>(null);
   const inputSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
@@ -21,62 +21,57 @@ const AudioCompanion: React.FC<AudioCompanionProps> = ({ language }) => {
   const sessionPromiseRef = useRef<Promise<any> | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
-  // Animation ref
+  // Visualizer Refs
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationFrameRef = useRef<number>(0);
   const analyserRef = useRef<AnalyserNode | null>(null);
 
   useEffect(() => {
-    // Cleanup on unmount
-    return () => {
-      stopSession();
-    };
+    return () => { stopSession(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const startSession = async () => {
     try {
       const apiKey = getApiKey();
-      if (!apiKey) {
-        throw new Error("API Key is missing.");
-      }
+      if (!apiKey) throw new Error("API Key is missing.");
 
       setStatus('connecting');
       setErrorMessage('');
 
-      // Security Check for Microphone
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error("Microphone access is not supported. Please ensure you are using HTTPS.");
+        throw new Error("Microphone not supported.");
       }
 
       const ai = new GoogleGenAI({ apiKey });
       
-      // Initialize Audio Contexts
-      // Try to request 16kHz, but browsers might ignore this and use hardware rate (e.g. 48kHz)
+      // 1. Setup Audio Contexts
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
       inputContextRef.current = new AudioContextClass({ sampleRate: 16000 });
-      
-      // Resume if suspended (common in deployed environments due to autoplay policies)
-      if (inputContextRef.current.state === 'suspended') {
-        await inputContextRef.current.resume();
-      }
+      if (inputContextRef.current.state === 'suspended') await inputContextRef.current.resume();
 
       outputContextRef.current = new AudioContextClass({ sampleRate: 24000 });
-      if (outputContextRef.current.state === 'suspended') {
-        await outputContextRef.current.resume();
-      }
+      if (outputContextRef.current.state === 'suspended') await outputContextRef.current.resume();
       
-      // Setup Visualizer
+      // 2. Setup Visualizer Node
       analyserRef.current = outputContextRef.current.createAnalyser();
-      analyserRef.current.fftSize = 256;
+      analyserRef.current.fftSize = 512;
+      analyserRef.current.smoothingTimeConstant = 0.6; // Smoother animation
       outputNodeRef.current = outputContextRef.current.createGain();
       outputNodeRef.current.connect(analyserRef.current);
       analyserRef.current.connect(outputContextRef.current.destination);
 
-      // Get Mic Stream
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // 3. Get Microphone
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: { 
+          echoCancellation: true, 
+          noiseSuppression: true,
+          autoGainControl: true 
+        } 
+      });
       streamRef.current = stream;
 
+      // 4. Configure Gemini
       const config = {
         model: 'gemini-2.5-flash-native-audio-preview-09-2025',
         config: {
@@ -84,22 +79,18 @@ const AudioCompanion: React.FC<AudioCompanionProps> = ({ language }) => {
           speechConfig: {
             voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } },
           },
-          systemInstruction: `You are BiblioGuide, a specialized AI voice assistant acting as a humble, loving pastor and Bible teacher.
+          systemInstruction: `You are BiblioGuide, a professional, warm, and wise Christian Pastor AI.
           
-          User Language Code: ${language}.
+          User Language: ${language}.
           
-          YOUR PERSONA:
-          - Give answers like a humble pastor teaching the Bible to his church.
-          - Speak with compassion, love, and clarity, under the wisdom of the Holy Spirit.
-          - Do NOT say 'Christianity says' or answer like a search engine. Instead, speak personally: "The Bible teaches us..." or "Jesus says...".
-          - Be encouraging, warm, and spiritually deep.
+          CORE RULES:
+          1. **BE CONCISE**: Keep answers short (1-3 sentences) unless asked to expound. Speed is key.
+          2. **BE WARM**: Speak with empathy and pastoral care.
+          3. **BE BIBLICAL**: Use scripture concepts naturally.
+          4. **NO FLUFF**: Skip long intros like "That is a wonderful question...". Jump straight to the answer.
           
-          LANGUAGE & VOCABULARY:
-          - If the user speaks in Hindi, Tamil, Telugu, or any other language, you MUST use the specific, traditional biblical terminology (Bible words) appropriate for that language's standard Bible translation.
-          - Do not use generic street language if a specific biblical term exists in that language (e.g. use "Satyavedam" or "Parishuddha Grandham" logic for Telugu context, "Vedagamam" for Tamil, etc).
-
-          RESTRICTIONS:
-          - STRICTLY REFUSE to discuss secular topics (sports, tech, politics) unrelated to faith. Politely redirect the user: "I am here to help with your spiritual walk. Do you have a question about the Bible?"`,
+          If the user speaks a non-English language, reply in that language using proper biblical terminology.
+          Strictly refuse secular topics (sports, politics) by politely steering back to faith.`,
         },
       };
 
@@ -116,7 +107,12 @@ const AudioCompanion: React.FC<AudioCompanionProps> = ({ language }) => {
              const base64Audio = message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
              if (base64Audio && outputContextRef.current) {
                 const ctx = outputContextRef.current;
-                nextStartTimeRef.current = Math.max(nextStartTimeRef.current, ctx.currentTime);
+                
+                // Low-latency playback logic
+                const currentTime = ctx.currentTime;
+                if (nextStartTimeRef.current < currentTime) {
+                    nextStartTimeRef.current = currentTime;
+                }
                 
                 const audioBuffer = await decodeAudioData(base64Audio, ctx);
                 const source = ctx.createBufferSource();
@@ -132,7 +128,6 @@ const AudioCompanion: React.FC<AudioCompanionProps> = ({ language }) => {
                 sourcesRef.current.add(source);
              }
 
-             // Handle Interruption
              if (message.serverContent?.interrupted) {
                 sourcesRef.current.forEach(src => src.stop());
                 sourcesRef.current.clear();
@@ -144,26 +139,24 @@ const AudioCompanion: React.FC<AudioCompanionProps> = ({ language }) => {
             setIsActive(false);
           },
           onerror: (err) => {
-            console.error("Live API Error:", err);
+            console.error(err);
             setStatus('error');
-            const msg = err.message?.toLowerCase() || "";
-            if (msg.includes("expired")) setErrorMessage("API Key Expired.");
-            else if (msg.includes("valid")) setErrorMessage("API Key Invalid.");
-            else setErrorMessage("Connection error. Please try again.");
+            setErrorMessage("Connection interrupted.");
             stopSession();
           }
         }
       });
       
       sessionPromiseRef.current = sessionPromise;
-      
-      // Await the connection to ensure we catch immediate network/handshake errors
       await sessionPromise;
 
     } catch (e: any) {
       console.error(e);
       setStatus('error');
-      setErrorMessage(e.message || "Failed to start audio session.");
+      const msg = e.message?.toLowerCase() || "";
+      if (msg.includes('expired')) setErrorMessage("API Key Expired. Please renew.");
+      else if (msg.includes('valid')) setErrorMessage("API Key Invalid.");
+      else setErrorMessage("Connection Failed.");
       stopSession();
     }
   };
@@ -179,11 +172,12 @@ const AudioCompanion: React.FC<AudioCompanionProps> = ({ language }) => {
         if (!inputContextRef.current) return;
 
         const inputData = e.inputBuffer.getChannelData(0);
+        
+        // Manual Downsampling to 16kHz
         const currentRate = inputContextRef.current.sampleRate;
         const targetRate = 16000;
-
-        // Downsample to 16kHz if necessary
         let finalData = inputData;
+        
         if (currentRate !== targetRate) {
           const ratio = currentRate / targetRate;
           const newLength = Math.floor(inputData.length / ratio);
@@ -196,12 +190,9 @@ const AudioCompanion: React.FC<AudioCompanionProps> = ({ language }) => {
         }
 
         const pcmBlob = createPcmBlob(finalData);
-        
         sessionPromiseRef.current?.then((session) => {
             session.sendRealtimeInput({ media: pcmBlob });
-        }).catch(err => {
-            console.error("Failed to send audio input:", err);
-        });
+        }).catch(() => {});
     };
 
     source.connect(processor);
@@ -212,33 +203,15 @@ const AudioCompanion: React.FC<AudioCompanionProps> = ({ language }) => {
   };
 
   const stopSession = () => {
-    // Stop Audio Input
-    if (processorRef.current) {
-        processorRef.current.disconnect();
-        processorRef.current = null;
-    }
-    if (inputSourceRef.current) {
-        inputSourceRef.current.disconnect();
-        inputSourceRef.current = null;
-    }
-    if (streamRef.current) {
-        streamRef.current.getTracks().forEach(t => t.stop());
-        streamRef.current = null;
-    }
-    if (inputContextRef.current) {
-        inputContextRef.current.close();
-        inputContextRef.current = null;
-    }
+    if (processorRef.current) { processorRef.current.disconnect(); processorRef.current = null; }
+    if (inputSourceRef.current) { inputSourceRef.current.disconnect(); inputSourceRef.current = null; }
+    if (streamRef.current) { streamRef.current.getTracks().forEach(t => t.stop()); streamRef.current = null; }
+    if (inputContextRef.current) { inputContextRef.current.close(); inputContextRef.current = null; }
 
-    // Stop Audio Output
     sourcesRef.current.forEach(s => s.stop());
     sourcesRef.current.clear();
-    if (outputContextRef.current) {
-        outputContextRef.current.close();
-        outputContextRef.current = null;
-    }
+    if (outputContextRef.current) { outputContextRef.current.close(); outputContextRef.current = null; }
 
-    // Close Session
     sessionPromiseRef.current?.then(session => session.close());
     sessionPromiseRef.current = null;
 
@@ -246,11 +219,11 @@ const AudioCompanion: React.FC<AudioCompanionProps> = ({ language }) => {
     setStatus('disconnected');
   };
 
-  // Visualizer Loop
+  // Professional 60FPS Visualizer (Paused if view is not active to save performance)
   useEffect(() => {
     const draw = () => {
-        if (!canvasRef.current || !analyserRef.current || !isActive) {
-            animationFrameRef.current = requestAnimationFrame(draw);
+        if (!canvasRef.current || !analyserRef.current || !isActive || !isActiveView) {
+            // Stop loop if inactive or view hidden
             return;
         }
         
@@ -262,92 +235,131 @@ const AudioCompanion: React.FC<AudioCompanionProps> = ({ language }) => {
         const dataArray = new Uint8Array(bufferLength);
         analyserRef.current.getByteFrequencyData(dataArray);
 
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        // Clear with fade effect for trail
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.2)'; // Slate-900 with opacity
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
         
-        // Simple circular visualizer
         const centerX = canvas.width / 2;
         const centerY = canvas.height / 2;
-        const radius = 50;
+        const radius = 60;
         
+        // Compute average volume for pulsing
+        let sum = 0;
+        for(let i=0; i<bufferLength; i++) sum += dataArray[i];
+        const average = sum / bufferLength;
+        const pulse = 1 + (average / 256) * 0.5;
+
+        // Draw Center Glow
         ctx.beginPath();
-        ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
-        ctx.fillStyle = '#f8fafc'; // slate-50
+        ctx.arc(centerX, centerY, radius * pulse, 0, 2 * Math.PI);
+        const gradient = ctx.createRadialGradient(centerX, centerY, radius * 0.5, centerX, centerY, radius * 1.5);
+        gradient.addColorStop(0, '#6366f1'); // Indigo-500
+        gradient.addColorStop(1, 'rgba(99, 102, 241, 0)');
+        ctx.fillStyle = gradient;
         ctx.fill();
 
-        const bars = 20;
+        // Draw Circular Bars
+        const bars = 64;
         const step = Math.PI * 2 / bars;
 
+        ctx.beginPath();
         for (let i = 0; i < bars; i++) {
-            const value = dataArray[i * 2]; // skip some bins
-            const barHeight = (value / 255) * 80;
+            const value = dataArray[i * 2] || 0;
+            const barHeight = (value / 255) * 80 * pulse;
             const angle = i * step;
             
-            const x1 = centerX + Math.cos(angle) * radius;
-            const y1 = centerY + Math.sin(angle) * radius;
-            const x2 = centerX + Math.cos(angle) * (radius + barHeight);
-            const y2 = centerY + Math.sin(angle) * (radius + barHeight);
+            const x1 = centerX + Math.cos(angle) * (radius * pulse);
+            const y1 = centerY + Math.sin(angle) * (radius * pulse);
+            const x2 = centerX + Math.cos(angle) * (radius * pulse + barHeight);
+            const y2 = centerY + Math.sin(angle) * (radius * pulse + barHeight);
             
-            ctx.beginPath();
             ctx.moveTo(x1, y1);
             ctx.lineTo(x2, y2);
-            ctx.strokeStyle = `rgba(99, 102, 241, ${value / 255 + 0.2})`; // Indigo color
-            ctx.lineWidth = 4;
-            ctx.lineCap = 'round';
-            ctx.stroke();
         }
+        ctx.strokeStyle = '#a5b4fc'; // Indigo-300
+        ctx.lineWidth = 2;
+        ctx.lineCap = 'round';
+        ctx.stroke();
         
         animationFrameRef.current = requestAnimationFrame(draw);
     };
     
-    if (isActive) {
+    if (isActive && isActiveView) {
         draw();
     } else {
         cancelAnimationFrame(animationFrameRef.current);
-        const ctx = canvasRef.current?.getContext('2d');
-        ctx?.clearRect(0, 0, canvasRef.current?.width || 0, canvasRef.current?.height || 0);
     }
     
     return () => cancelAnimationFrame(animationFrameRef.current);
-  }, [isActive]);
+  }, [isActive, isActiveView]); // Re-run effect when activeView changes
 
   return (
-    <div className="flex flex-col items-center justify-center h-full p-6 text-center">
-        <h2 className="text-3xl serif text-slate-800 dark:text-white mb-2">Faith Voice Assistant</h2>
-        <p className="text-slate-500 dark:text-slate-300 mb-10 max-w-md">Speak naturally to ask questions, seek comfort, or discuss scripture in real-time.</p>
-        
-        <div className="relative mb-12">
-            <canvas 
-                ref={canvasRef} 
-                width={300} 
-                height={300} 
-                className="rounded-full bg-slate-100 dark:bg-slate-800 shadow-inner"
-            />
-             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <svg xmlns="http://www.w3.org/2000/svg" className={`h-16 w-16 text-indigo-500 ${isActive ? 'opacity-80' : 'opacity-20'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-                </svg>
-             </div>
+    <div className="flex flex-col h-full bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 relative overflow-hidden text-white">
+        {/* Background Effects */}
+        <div className="absolute inset-0 pointer-events-none">
+            <div className="absolute top-0 left-0 w-full h-1/2 bg-gradient-to-b from-indigo-500/10 to-transparent"></div>
+            <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-amber-500/5 rounded-full blur-[100px]"></div>
         </div>
 
-        {errorMessage && (
-            <div className="text-red-500 bg-red-50 dark:bg-red-900/20 px-4 py-2 rounded-lg mb-4 text-sm max-w-md break-words">
-                {errorMessage}
-            </div>
-        )}
+        {/* Header */}
+        <div className="relative z-10 px-6 py-6 flex justify-between items-center border-b border-white/5 bg-black/20 backdrop-blur-sm shrink-0">
+           <div>
+               <h2 className="text-xl font-serif font-bold text-white tracking-wide">Live Counselor</h2>
+               <p className="text-xs text-indigo-200 uppercase tracking-widest font-semibold">{status === 'connected' ? 'Online' : 'Standby'}</p>
+           </div>
+           <div className={`w-3 h-3 rounded-full ${status === 'connected' ? 'bg-green-400 shadow-[0_0_10px_#4ade80]' : status === 'connecting' ? 'bg-amber-400 animate-pulse' : 'bg-slate-600'}`}></div>
+        </div>
 
-        <button
-            onClick={isActive ? stopSession : startSession}
-            disabled={status === 'connecting'}
-            className={`px-8 py-4 rounded-full font-semibold text-lg shadow-lg transition-all transform hover:scale-105 ${
-                isActive 
-                    ? 'bg-red-500 text-white hover:bg-red-600 ring-4 ring-red-100 dark:ring-red-900/30' 
-                    : 'bg-indigo-600 text-white hover:bg-indigo-700 ring-4 ring-indigo-100 dark:ring-indigo-900/30'
-            } ${status === 'connecting' ? 'opacity-70 cursor-wait' : ''}`}
-        >
-            {status === 'connecting' ? 'Connecting...' : isActive ? 'End Conversation' : 'Start Talking'}
-        </button>
-        
-        <p className="mt-6 text-xs text-slate-400">Powered by Gemini 2.5 Native Audio</p>
+        {/* Main Content */}
+        <div className="flex-1 flex flex-col items-center justify-center relative z-10 min-h-0">
+            <div className="relative mb-8">
+                <canvas 
+                    ref={canvasRef} 
+                    width={400} 
+                    height={400} 
+                    className="rounded-full"
+                />
+                {!isActive && (
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <div className="w-32 h-32 rounded-full border border-white/10 flex items-center justify-center bg-white/5 backdrop-blur-sm">
+                            <svg className="w-10 h-10 text-indigo-400/50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            <p className={`text-lg font-serif italic text-center max-w-sm transition-all duration-500 px-4 ${isActive ? 'text-indigo-100 opacity-100' : 'text-slate-500 opacity-0 translate-y-4'}`}>
+               "I am here to listen. Speak your heart."
+            </p>
+        </div>
+
+        {/* Controls */}
+        <div className="p-8 pb-32 flex flex-col items-center justify-center relative z-10 bg-gradient-to-t from-black/80 to-transparent shrink-0">
+            {errorMessage && (
+                <div className="mb-4 px-4 py-2 bg-red-900/40 border border-red-500/30 text-red-200 text-sm rounded-lg backdrop-blur-md animate-in slide-in-from-bottom-2">
+                    {errorMessage}
+                </div>
+            )}
+            
+            <button
+                onClick={isActive ? stopSession : startSession}
+                disabled={status === 'connecting'}
+                className={`group relative flex items-center justify-center gap-3 px-10 py-5 rounded-full font-bold tracking-wider transition-all duration-300 shadow-2xl ${
+                    isActive 
+                        ? 'bg-red-500/20 text-red-200 border border-red-500/50 hover:bg-red-500/30' 
+                        : 'bg-indigo-600 text-white hover:bg-indigo-500 hover:scale-105 shadow-indigo-500/30'
+                } ${status === 'connecting' ? 'opacity-70 cursor-wait' : ''}`}
+            >
+                {status === 'connecting' ? (
+                   <> <span className="w-2 h-2 bg-white rounded-full animate-bounce"></span> CONNECTING... </>
+                ) : isActive ? (
+                   <> <span className="w-2 h-2 bg-red-400 rounded-full animate-pulse"></span> END SESSION </>
+                ) : (
+                   <> <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg> START CONVERSATION </>
+                )}
+            </button>
+            <p className="mt-4 text-[10px] text-slate-500 uppercase tracking-widest font-semibold">Gemini 2.5 Native Audio</p>
+        </div>
     </div>
   );
 };
