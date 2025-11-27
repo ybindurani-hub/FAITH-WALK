@@ -108,7 +108,7 @@ const MissionaryBio: React.FC<MissionaryBioProps> = ({ language }) => {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto pb-48">
+        <div className="flex-1 overflow-y-auto pb-40">
           {bioData && (
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-8 duration-700">
               {bioData.locations.length > 0 && (

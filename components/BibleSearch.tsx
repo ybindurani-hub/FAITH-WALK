@@ -90,7 +90,7 @@ const BibleSearch: React.FC<BibleSearchProps> = ({ language }) => {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto pb-48">
+        <div className="flex-1 overflow-y-auto pb-40">
           {result && (
             <div className="bg-white dark:bg-slate-900 p-8 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 animate-in fade-in slide-in-from-bottom-4 transition-colors">
               <div className="flex justify-end mb-4 border-b border-slate-50 dark:border-slate-800 pb-2 gap-2">

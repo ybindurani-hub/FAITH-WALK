@@ -130,7 +130,7 @@ const SermonBuilder: React.FC<SermonBuilderProps> = ({ language }) => {
         )}
 
         {sermon && (
-          <div className="flex-1 overflow-y-auto bg-white dark:bg-slate-900 p-8 md:p-12 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 pb-48 animate-in fade-in slide-in-from-bottom-8 relative transition-colors">
+          <div className="flex-1 overflow-y-auto bg-white dark:bg-slate-900 p-8 md:p-12 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 pb-40 animate-in fade-in slide-in-from-bottom-8 relative transition-colors">
             <div className="flex justify-between items-center mb-8 border-b border-slate-100 dark:border-slate-800 pb-4 sticky top-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur z-10">
                  <button onClick={() => setSermon('')} className="text-sm font-bold text-slate-400 hover:text-indigo-600 flex items-center gap-2 uppercase tracking-wider transition-colors">
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg> Start Over

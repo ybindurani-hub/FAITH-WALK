@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { View } from './types';
 import LoadingScreen from './components/LoadingScreen';
@@ -71,7 +70,8 @@ const App: React.FC = () => {
   );
 
   return (
-    <div className="h-[100dvh] flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white font-sans overflow-hidden transition-colors duration-300">
+    // Fixed inset-0 ensures app fills screen exactly on mobile webviews without scroll issues
+    <div className="fixed inset-0 w-full h-full flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white font-sans overflow-hidden transition-colors duration-300">
         
       {/* Top Header */}
       <header className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-100 dark:border-slate-800 px-4 py-3 flex items-center justify-between sticky top-0 z-40 shadow-sm shrink-0 transition-colors">
