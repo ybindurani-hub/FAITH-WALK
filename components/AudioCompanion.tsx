@@ -45,7 +45,6 @@ const AudioCompanion: React.FC<AudioCompanionProps> = ({ language, isActiveView 
 
       const ai = new GoogleGenAI({ apiKey });
       
-      // 1. Setup Audio Contexts
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
       inputContextRef.current = new AudioContextClass({ sampleRate: 16000 });
       if (inputContextRef.current.state === 'suspended') await inputContextRef.current.resume();
@@ -53,15 +52,13 @@ const AudioCompanion: React.FC<AudioCompanionProps> = ({ language, isActiveView 
       outputContextRef.current = new AudioContextClass({ sampleRate: 24000 });
       if (outputContextRef.current.state === 'suspended') await outputContextRef.current.resume();
       
-      // 2. Setup Visualizer Node
       analyserRef.current = outputContextRef.current.createAnalyser();
       analyserRef.current.fftSize = 512;
-      analyserRef.current.smoothingTimeConstant = 0.6; // Smoother animation
+      analyserRef.current.smoothingTimeConstant = 0.6;
       outputNodeRef.current = outputContextRef.current.createGain();
       outputNodeRef.current.connect(analyserRef.current);
       analyserRef.current.connect(outputContextRef.current.destination);
 
-      // 3. Get Microphone
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: { 
           echoCancellation: true, 
@@ -71,7 +68,6 @@ const AudioCompanion: React.FC<AudioCompanionProps> = ({ language, isActiveView 
       });
       streamRef.current = stream;
 
-      // 4. Configure Gemini
       const config = {
         model: 'gemini-2.5-flash-native-audio-preview-09-2025',
         config: {
@@ -80,17 +76,11 @@ const AudioCompanion: React.FC<AudioCompanionProps> = ({ language, isActiveView 
             voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } },
           },
           systemInstruction: `You are BiblioGuide, a professional, warm, and wise Christian Pastor AI.
-          
           User Language: ${language}.
-          
-          CORE RULES:
-          1. **BE CONCISE**: Keep answers short (1-3 sentences) unless asked to expound. Speed is key.
-          2. **BE WARM**: Speak with empathy and pastoral care.
-          3. **BE BIBLICAL**: Use scripture concepts naturally.
-          4. **NO FLUFF**: Skip long intros like "That is a wonderful question...". Jump straight to the answer.
-          
-          If the user speaks a non-English language, reply in that language using proper biblical terminology.
-          Strictly refuse secular topics (sports, politics) by politely steering back to faith.`,
+          BE CONCISE: Keep answers short (1-3 sentences).
+          BE WARM: Speak with empathy.
+          NO FLUFF: Jump straight to the answer.
+          If non-English, reply in that language.`,
         },
       };
 
@@ -103,26 +93,18 @@ const AudioCompanion: React.FC<AudioCompanionProps> = ({ language, isActiveView 
             setupAudioInput(stream);
           },
           onmessage: async (message: LiveServerMessage) => {
-             // Handle Audio Output
              const base64Audio = message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
              if (base64Audio && outputContextRef.current) {
                 const ctx = outputContextRef.current;
-                
-                // Low-latency playback logic
                 const currentTime = ctx.currentTime;
                 if (nextStartTimeRef.current < currentTime) {
                     nextStartTimeRef.current = currentTime;
                 }
-                
                 const audioBuffer = await decodeAudioData(base64Audio, ctx);
                 const source = ctx.createBufferSource();
                 source.buffer = audioBuffer;
                 source.connect(outputNodeRef.current!);
-                
-                source.addEventListener('ended', () => {
-                    sourcesRef.current.delete(source);
-                });
-                
+                source.addEventListener('ended', () => { sourcesRef.current.delete(source); });
                 source.start(nextStartTimeRef.current);
                 nextStartTimeRef.current += audioBuffer.duration;
                 sourcesRef.current.add(source);
@@ -163,17 +145,13 @@ const AudioCompanion: React.FC<AudioCompanionProps> = ({ language, isActiveView 
 
   const setupAudioInput = (stream: MediaStream) => {
     if (!inputContextRef.current) return;
-    
     const ctx = inputContextRef.current;
     const source = ctx.createMediaStreamSource(stream);
     const processor = ctx.createScriptProcessor(4096, 1, 1);
     
     processor.onaudioprocess = (e) => {
         if (!inputContextRef.current) return;
-
         const inputData = e.inputBuffer.getChannelData(0);
-        
-        // Manual Downsampling to 16kHz
         const currentRate = inputContextRef.current.sampleRate;
         const targetRate = 16000;
         let finalData = inputData;
@@ -197,7 +175,6 @@ const AudioCompanion: React.FC<AudioCompanionProps> = ({ language, isActiveView 
 
     source.connect(processor);
     processor.connect(ctx.destination);
-    
     inputSourceRef.current = source;
     processorRef.current = processor;
   };
@@ -219,13 +196,9 @@ const AudioCompanion: React.FC<AudioCompanionProps> = ({ language, isActiveView 
     setStatus('disconnected');
   };
 
-  // Professional 60FPS Visualizer (Paused if view is not active to save performance)
   useEffect(() => {
     const draw = () => {
-        if (!canvasRef.current || !analyserRef.current || !isActive || !isActiveView) {
-            // Stop loop if inactive or view hidden
-            return;
-        }
+        if (!canvasRef.current || !analyserRef.current || !isActive || !isActiveView) { return; }
         
         const canvas = canvasRef.current;
         const ctx = canvas.getContext('2d');
@@ -235,30 +208,26 @@ const AudioCompanion: React.FC<AudioCompanionProps> = ({ language, isActiveView 
         const dataArray = new Uint8Array(bufferLength);
         analyserRef.current.getByteFrequencyData(dataArray);
 
-        // Clear with fade effect for trail
-        ctx.fillStyle = 'rgba(15, 23, 42, 0.2)'; // Slate-900 with opacity
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.2)';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         
         const centerX = canvas.width / 2;
         const centerY = canvas.height / 2;
         const radius = 60;
         
-        // Compute average volume for pulsing
         let sum = 0;
         for(let i=0; i<bufferLength; i++) sum += dataArray[i];
         const average = sum / bufferLength;
         const pulse = 1 + (average / 256) * 0.5;
 
-        // Draw Center Glow
         ctx.beginPath();
         ctx.arc(centerX, centerY, radius * pulse, 0, 2 * Math.PI);
         const gradient = ctx.createRadialGradient(centerX, centerY, radius * 0.5, centerX, centerY, radius * 1.5);
-        gradient.addColorStop(0, '#6366f1'); // Indigo-500
+        gradient.addColorStop(0, '#6366f1');
         gradient.addColorStop(1, 'rgba(99, 102, 241, 0)');
         ctx.fillStyle = gradient;
         ctx.fill();
 
-        // Draw Circular Bars
         const bars = 64;
         const step = Math.PI * 2 / bars;
 
@@ -276,7 +245,7 @@ const AudioCompanion: React.FC<AudioCompanionProps> = ({ language, isActiveView 
             ctx.moveTo(x1, y1);
             ctx.lineTo(x2, y2);
         }
-        ctx.strokeStyle = '#a5b4fc'; // Indigo-300
+        ctx.strokeStyle = '#a5b4fc';
         ctx.lineWidth = 2;
         ctx.lineCap = 'round';
         ctx.stroke();
@@ -284,24 +253,18 @@ const AudioCompanion: React.FC<AudioCompanionProps> = ({ language, isActiveView 
         animationFrameRef.current = requestAnimationFrame(draw);
     };
     
-    if (isActive && isActiveView) {
-        draw();
-    } else {
-        cancelAnimationFrame(animationFrameRef.current);
-    }
-    
+    if (isActive && isActiveView) { draw(); } 
+    else { cancelAnimationFrame(animationFrameRef.current); }
     return () => cancelAnimationFrame(animationFrameRef.current);
-  }, [isActive, isActiveView]); // Re-run effect when activeView changes
+  }, [isActive, isActiveView]);
 
   return (
-    <div className="flex flex-col h-full bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 relative overflow-hidden text-white">
-        {/* Background Effects */}
+    <div className="flex flex-col h-full bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 relative overflow-hidden text-white rounded-xl my-2 mx-2">
         <div className="absolute inset-0 pointer-events-none">
             <div className="absolute top-0 left-0 w-full h-1/2 bg-gradient-to-b from-indigo-500/10 to-transparent"></div>
             <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-amber-500/5 rounded-full blur-[100px]"></div>
         </div>
 
-        {/* Header */}
         <div className="relative z-10 px-6 py-6 flex justify-between items-center border-b border-white/5 bg-black/20 backdrop-blur-sm shrink-0">
            <div>
                <h2 className="text-xl font-serif font-bold text-white tracking-wide">Live Counselor</h2>
@@ -310,31 +273,23 @@ const AudioCompanion: React.FC<AudioCompanionProps> = ({ language, isActiveView 
            <div className={`w-3 h-3 rounded-full ${status === 'connected' ? 'bg-green-400 shadow-[0_0_10px_#4ade80]' : status === 'connecting' ? 'bg-amber-400 animate-pulse' : 'bg-slate-600'}`}></div>
         </div>
 
-        {/* Main Content */}
         <div className="flex-1 flex flex-col items-center justify-center relative z-10 min-h-0">
             <div className="relative mb-8">
-                <canvas 
-                    ref={canvasRef} 
-                    width={400} 
-                    height={400} 
-                    className="rounded-full"
-                />
+                <canvas ref={canvasRef} width={400} height={400} className="rounded-full max-w-[280px] max-h-[280px]" />
                 {!isActive && (
                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                        <div className="w-32 h-32 rounded-full border border-white/10 flex items-center justify-center bg-white/5 backdrop-blur-sm">
-                            <svg className="w-10 h-10 text-indigo-400/50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>
+                        <div className="w-24 h-24 rounded-full border border-white/10 flex items-center justify-center bg-white/5 backdrop-blur-sm">
+                            <svg className="w-8 h-8 text-indigo-400/50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>
                         </div>
                     </div>
                 )}
             </div>
-
             <p className={`text-lg font-serif italic text-center max-w-sm transition-all duration-500 px-4 ${isActive ? 'text-indigo-100 opacity-100' : 'text-slate-500 opacity-0 translate-y-4'}`}>
                "I am here to listen. Speak your heart."
             </p>
         </div>
 
-        {/* Controls */}
-        <div className="p-8 pb-32 flex flex-col items-center justify-center relative z-10 bg-gradient-to-t from-black/80 to-transparent shrink-0">
+        <div className="p-8 flex flex-col items-center justify-center relative z-10 bg-gradient-to-t from-black/80 to-transparent shrink-0">
             {errorMessage && (
                 <div className="mb-4 px-4 py-2 bg-red-900/40 border border-red-500/30 text-red-200 text-sm rounded-lg backdrop-blur-md animate-in slide-in-from-bottom-2">
                     {errorMessage}
@@ -363,5 +318,4 @@ const AudioCompanion: React.FC<AudioCompanionProps> = ({ language, isActiveView 
     </div>
   );
 };
-
 export default AudioCompanion;

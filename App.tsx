@@ -70,11 +70,11 @@ const App: React.FC = () => {
   );
 
   return (
-    // Fixed inset-0 ensures app fills screen exactly on mobile webviews without scroll issues
-    <div className="fixed inset-0 w-full h-full flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white font-sans overflow-hidden transition-colors duration-300">
+    // Changed: Use min-h-screen instead of fixed inset-0 to allow body scrolling
+    <div className="flex flex-col min-h-screen w-full bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white font-sans transition-colors duration-300">
         
-      {/* Top Header */}
-      <header className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-100 dark:border-slate-800 px-4 py-3 flex items-center justify-between sticky top-0 z-40 shadow-sm shrink-0 transition-colors">
+      {/* Top Header - Sticky ensures it stays at top while body scrolls */}
+      <header className="sticky top-0 z-50 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-100 dark:border-slate-800 px-4 py-3 flex items-center justify-between shadow-sm">
         <div className="flex items-center gap-2 text-indigo-700 dark:text-indigo-400">
           <div className="p-1.5 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -110,19 +110,22 @@ const App: React.FC = () => {
         </div>
       </header>
 
-      <main className="flex-1 overflow-hidden relative w-full min-h-0">
+      {/* Main - Flex-1 ensures it grows, but min-h-0 is removed so it pushes body height */}
+      <main className="flex-1 w-full flex flex-col pb-32">
         <Suspense fallback={<LoadingScreen />}>
           {/* Keep components mounted to preserve state (Audio/Search Results) */}
-          <div className={currentView === View.BIBLE_SEARCH ? 'block h-full' : 'hidden'}><BibleSearch language={language} /></div>
-          <div className={currentView === View.MISSIONARY ? 'block h-full' : 'hidden'}><MissionaryBio language={language} /></div>
-          <div className={currentView === View.SERMON ? 'block h-full' : 'hidden'}><SermonBuilder language={language} /></div>
-          {/* Pass isActiveView to pause visualizer animations when hidden */}
-          <div className={currentView === View.AUDIO_COMPANION ? 'block h-full' : 'hidden'}><AudioCompanion language={language} isActiveView={currentView === View.AUDIO_COMPANION} /></div>
-          <div className={currentView === View.HISTORY ? 'block h-full' : 'hidden'}><HistoryView /></div>
+          {/* Use display: none instead of rendering null to keep state active */}
+          <div className={currentView === View.BIBLE_SEARCH ? 'block' : 'hidden'}><BibleSearch language={language} /></div>
+          <div className={currentView === View.MISSIONARY ? 'block' : 'hidden'}><MissionaryBio language={language} /></div>
+          <div className={currentView === View.SERMON ? 'block' : 'hidden'}><SermonBuilder language={language} /></div>
+          {/* AudioCompanion handles its own height internally if needed */}
+          <div className={currentView === View.AUDIO_COMPANION ? 'block h-[85vh]' : 'hidden'}><AudioCompanion language={language} isActiveView={currentView === View.AUDIO_COMPANION} /></div>
+          <div className={currentView === View.HISTORY ? 'block' : 'hidden'}><HistoryView /></div>
         </Suspense>
       </main>
 
-      <nav className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-lg border-t border-slate-200 dark:border-slate-800 pb-safe z-40 shrink-0 transition-colors">
+      {/* Footer - Fixed bottom ensures it stays visible even when scrolled */}
+      <nav className="fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-lg border-t border-slate-200 dark:border-slate-800 z-50 pb-safe shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
         <div className="flex justify-between max-w-2xl mx-auto px-2">
           <NavButton 
             view={View.BIBLE_SEARCH} 
