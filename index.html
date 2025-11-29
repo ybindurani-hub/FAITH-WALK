@@ -23,25 +23,29 @@
     </script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Merriweather:wght@300;400;700&display=swap" rel="stylesheet">
     <style>
-      /* CRITICAL FIX FOR WEBVIEWS: Allow body to scroll naturally */
-      html {
+      /* ROBUST MOBILE LAYOUT FIX */
+      html, body {
         height: 100%;
-        overflow-y: scroll !important; /* Force scrollbar track */
-        -webkit-overflow-scrolling: touch; /* Smooth scroll on iOS */
-      }
-      body {
-        min-height: 100%;
         width: 100%;
-        margin: 0;
+        margin: 0; 
         padding: 0;
-        overflow-x: hidden;
-        overflow-y: auto !important; /* Enable native scrolling */
+        overflow: hidden; /* Prevent body scroll fighting */
         background-color: #f8fafc;
+        position: fixed; /* Lock body in place */
+      }
+      #root {
+        height: 100%;
+        width: 100%;
+        overflow-y: auto; /* Root handles scrolling */
+        -webkit-overflow-scrolling: touch;
+        display: flex;
+        flex-direction: column;
+        position: relative;
       }
       .serif {
         font-family: 'Merriweather', serif;
       }
-      /* Hide scrollbar for cleaner look but keep functionality */
+      /* Hide scrollbar visually but keep functionality */
       ::-webkit-scrollbar {
         width: 0px;
         background: transparent;
@@ -59,7 +63,7 @@
 </script>
 </head>
   <body class="bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white transition-colors duration-300">
-    <div id="root" class="w-full min-h-full"></div>
+    <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
   </body>
 </html>

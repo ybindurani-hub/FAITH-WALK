@@ -27,7 +27,7 @@ const BibleSearch: React.FC<BibleSearchProps> = ({ language }) => {
       if (text === "MISSING_KEY" || text === "INVALID_KEY") {
         setResult("API Key Issue: Please ensure your environment is configured correctly.");
       } else if (text === "KEY_LEAKED") {
-        setResult("SECURITY ALERT: Your Google API Key was disabled because it was leaked online. Please generate a new key at aistudio.google.com and update your project.");
+        setResult("SECURITY ALERT: Your Google API Key was disabled because it was leaked online. Please generate a new key at aistudio.google.com.");
       } else if (text === "KEY_EXPIRED") {
         setResult("API KEY EXPIRED: Your Google API Key is no longer valid. Please generate a new key at aistudio.google.com.");
       } else {
@@ -65,13 +65,13 @@ const BibleSearch: React.FC<BibleSearchProps> = ({ language }) => {
   const togglePlayback = () => { if (audioRef.current) isPlaying ? audioRef.current.pause() : audioRef.current.play(); };
 
   return (
-    <div className="flex flex-col h-full relative">
+    <div className="flex flex-col min-h-full relative">
       {loading && <LoadingScreen />}
       
-      <div className="p-4 max-w-3xl mx-auto w-full flex-1 flex flex-col min-h-0">
-        <h2 className="text-3xl font-serif font-bold text-slate-800 dark:text-white mb-6 text-center shrink-0">Scripture Search</h2>
+      <div className="p-4 max-w-3xl mx-auto w-full flex-1 flex flex-col">
+        <h2 className="text-3xl font-serif font-bold text-slate-800 dark:text-white mb-6 text-center">Scripture Search</h2>
         
-        <div className="relative mb-6 shrink-0 group">
+        <div className="relative mb-6 group">
           <input
             type="text"
             className="w-full p-4 pr-24 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-white shadow-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none text-lg transition-all"
@@ -90,7 +90,8 @@ const BibleSearch: React.FC<BibleSearchProps> = ({ language }) => {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto pb-40">
+        {/* Removed internal scrolling (overflow-y-auto) to allow natural document flow */}
+        <div className="flex-1 pb-4">
           {result && (
             <div className="bg-white dark:bg-slate-900 p-8 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 animate-in fade-in slide-in-from-bottom-4 transition-colors">
               <div className="flex justify-end mb-4 border-b border-slate-50 dark:border-slate-800 pb-2 gap-2">

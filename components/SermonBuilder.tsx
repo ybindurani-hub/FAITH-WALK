@@ -33,7 +33,7 @@ const SermonBuilder: React.FC<SermonBuilderProps> = ({ language }) => {
       if (result === "MISSING_KEY" || result === "INVALID_KEY") {
         setSermon("API Key Missing or Invalid. Please check your environment variables.");
       } else if (result === "KEY_LEAKED") {
-        setSermon("SECURITY ALERT: Your Google API Key was disabled because it was leaked online. Please generate a new key at aistudio.google.com and update your project.");
+        setSermon("SECURITY ALERT: Your Google API Key was disabled because it was leaked online. Please generate a new key at aistudio.google.com.");
       } else if (result === "KEY_EXPIRED") {
         setSermon("API KEY EXPIRED: Your Google API Key is no longer valid. Please generate a new key at aistudio.google.com.");
       } else {
@@ -78,10 +78,10 @@ const SermonBuilder: React.FC<SermonBuilderProps> = ({ language }) => {
   const togglePlayback = () => { if (audioRef.current) isPlaying ? audioRef.current.pause() : audioRef.current.play(); };
 
   return (
-    <div className="flex flex-col h-full relative">
+    <div className="flex flex-col min-h-full relative">
       {loading && <LoadingScreen />}
 
-      <div className="p-4 max-w-5xl mx-auto w-full flex-1 flex flex-col min-h-0">
+      <div className="p-4 max-w-5xl mx-auto w-full flex-1 flex flex-col">
         {!sermon && (
           <div className="text-center mb-6 pt-4 shrink-0 animate-in fade-in slide-in-from-top-4">
             <h2 className="text-3xl font-serif font-bold text-slate-800 dark:text-indigo-100 mb-2">Pulpit AI</h2>
@@ -129,33 +129,36 @@ const SermonBuilder: React.FC<SermonBuilderProps> = ({ language }) => {
           </div>
         )}
 
-        {sermon && (
-          <div className="flex-1 overflow-y-auto bg-white dark:bg-slate-900 p-8 md:p-12 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 pb-40 animate-in fade-in slide-in-from-bottom-8 relative transition-colors">
-            <div className="flex justify-between items-center mb-8 border-b border-slate-100 dark:border-slate-800 pb-4 sticky top-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur z-10">
-                 <button onClick={() => setSermon('')} className="text-sm font-bold text-slate-400 hover:text-indigo-600 flex items-center gap-2 uppercase tracking-wider transition-colors">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg> Start Over
-                </button>
-                 <div className="flex items-center gap-3">
-                     {audioUrl && <audio ref={audioRef} src={audioUrl} autoPlay onEnded={() => setIsPlaying(false)} onPause={() => setIsPlaying(false)} onPlay={() => setIsPlaying(true)} />}
-                     {!audioUrl ? (
-                        <button onClick={generateAudio} disabled={isAudioLoading} className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 px-3 py-2 rounded-lg transition-colors border border-indigo-100 dark:border-indigo-900">
-                           {isAudioLoading ? "Preparing..." : "Listen to Sermon"}
-                        </button>
-                     ) : (
-                        <button onClick={togglePlayback} className="p-2 text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 rounded-md transition-all flex items-center gap-2 px-3 font-bold text-xs">
-                          {isPlaying ? "PAUSE AUDIO" : "RESUME AUDIO"}
-                        </button>
-                     )}
-                 </div>
+        {/* Removed internal scrolling to fix WebView height bug */}
+        <div className="flex-1 pb-4">
+          {sermon && (
+            <div className="bg-white dark:bg-slate-900 p-8 md:p-12 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 animate-in fade-in slide-in-from-bottom-8 relative transition-colors">
+              <div className="flex justify-between items-center mb-8 border-b border-slate-100 dark:border-slate-800 pb-4 sticky top-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur z-10">
+                   <button onClick={() => setSermon('')} className="text-sm font-bold text-slate-400 hover:text-indigo-600 flex items-center gap-2 uppercase tracking-wider transition-colors">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg> Start Over
+                  </button>
+                   <div className="flex items-center gap-3">
+                       {audioUrl && <audio ref={audioRef} src={audioUrl} autoPlay onEnded={() => setIsPlaying(false)} onPause={() => setIsPlaying(false)} onPlay={() => setIsPlaying(true)} />}
+                       {!audioUrl ? (
+                          <button onClick={generateAudio} disabled={isAudioLoading} className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 px-3 py-2 rounded-lg transition-colors border border-indigo-100 dark:border-indigo-900">
+                             {isAudioLoading ? "Preparing..." : "Listen to Sermon"}
+                          </button>
+                       ) : (
+                          <button onClick={togglePlayback} className="p-2 text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 rounded-md transition-all flex items-center gap-2 px-3 font-bold text-xs">
+                            {isPlaying ? "PAUSE AUDIO" : "RESUME AUDIO"}
+                          </button>
+                       )}
+                   </div>
+              </div>
+              <div className="prose prose-indigo dark:prose-invert prose-lg max-w-none font-serif text-slate-700 dark:text-slate-300">
+                {cleanMarkdown(sermon).split('\n').map((line, i) => {
+                    if (line.trim() === '') return <br key={i} />;
+                    return <p key={i} className="mb-4 leading-8">{line}</p>;
+                })}
+              </div>
             </div>
-            <div className="prose prose-indigo dark:prose-invert prose-lg max-w-none font-serif text-slate-700 dark:text-slate-300">
-              {cleanMarkdown(sermon).split('\n').map((line, i) => {
-                  if (line.trim() === '') return <br key={i} />;
-                  return <p key={i} className="mb-4 leading-8">{line}</p>;
-              })}
-            </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );

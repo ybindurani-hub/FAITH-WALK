@@ -27,7 +27,7 @@ const MissionaryBio: React.FC<MissionaryBioProps> = ({ language }) => {
       if (data.text === "MISSING_KEY" || data.text === "INVALID_KEY") {
         setBioData({ text: "API Key Error. Please ensure your environment is configured correctly.", locations: [] });
       } else if (data.text === "KEY_LEAKED") {
-        setBioData({ text: "SECURITY ALERT: Your Google API Key was disabled because it was leaked online. Please generate a new key at aistudio.google.com and update your project.", locations: [] });
+        setBioData({ text: "SECURITY ALERT: Your Google API Key was disabled because it was leaked online. Please generate a new key at aistudio.google.com.", locations: [] });
       } else if (data.text === "KEY_EXPIRED") {
         setBioData({ text: "API KEY EXPIRED: Your Google API Key is no longer valid. Please generate a new key at aistudio.google.com.", locations: [] });
       } else {
@@ -78,10 +78,10 @@ const MissionaryBio: React.FC<MissionaryBioProps> = ({ language }) => {
   };
 
   return (
-    <div className="flex flex-col h-full relative">
+    <div className="flex flex-col min-h-full relative">
       {loading && <LoadingScreen />}
 
-      <div className="p-4 max-w-3xl mx-auto w-full flex-1 flex flex-col min-h-0">
+      <div className="p-4 max-w-3xl mx-auto w-full flex-1 flex flex-col">
         <div className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/30 dark:to-orange-900/20 rounded-2xl p-8 mb-6 border border-amber-100 dark:border-amber-900/50 shadow-sm shrink-0 transition-colors">
           <h2 className="text-3xl font-serif font-bold text-amber-900 dark:text-amber-100 mb-2">Heroes of Faith</h2>
           <p className="text-amber-800/80 dark:text-amber-200/60 text-sm mb-6">Explore the lives of God's Generals, Revivalists, and Reformers.</p>
@@ -108,7 +108,8 @@ const MissionaryBio: React.FC<MissionaryBioProps> = ({ language }) => {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto pb-40">
+        {/* Removed internal scrolling to fix WebView height bug */}
+        <div className="flex-1 pb-4">
           {bioData && (
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-8 duration-700">
               {bioData.locations.length > 0 && (
