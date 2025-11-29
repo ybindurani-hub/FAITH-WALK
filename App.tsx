@@ -1,9 +1,9 @@
 import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { View } from './types';
 import LoadingScreen from './components/LoadingScreen';
+import BibleSearch from './components/BibleSearch'; // Static import for instant load
 
-// Lazy load components
-const BibleSearch = lazy(() => import('./components/BibleSearch'));
+// Lazy load other components
 const MissionaryBio = lazy(() => import('./components/MissionaryBio'));
 const SermonBuilder = lazy(() => import('./components/SermonBuilder'));
 const AudioCompanion = lazy(() => import('./components/AudioCompanion'));
@@ -23,6 +23,9 @@ const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>(View.BIBLE_SEARCH);
   const [language, setLanguage] = useState<string>('en-US');
   const [darkMode, setDarkMode] = useState(false);
+  
+  // Track which views have been loaded to prevent lazy fetching before needed
+  const [visitedViews, setVisitedViews] = useState<Set<View>>(new Set([View.BIBLE_SEARCH]));
 
   useEffect(() => {
     if (darkMode) {
@@ -32,9 +35,18 @@ const App: React.FC = () => {
     }
   }, [darkMode]);
 
+  const changeView = (view: View) => {
+    setCurrentView(view);
+    setVisitedViews(prev => {
+        const next = new Set(prev);
+        next.add(view);
+        return next;
+    });
+  };
+
   const NavButton = ({ view, label, icon }: { view: View; label: string; icon: React.ReactNode }) => (
     <button
-      onClick={() => setCurrentView(view)}
+      onClick={() => changeView(view)}
       className={`flex flex-col items-center justify-center w-full py-3 transition-all duration-300 ${
         currentView === view 
           ? 'text-indigo-600 dark:text-indigo-400 -translate-y-1' 
@@ -90,22 +102,33 @@ const App: React.FC = () => {
 
       {/* Main Content - Grows to fill space, allowing natural scroll */}
       <main className="flex-1 w-full flex flex-col pb-40">
+        {/* Bible Search is Static - Instantly Visible */}
+        <div className={`${currentView === View.BIBLE_SEARCH ? 'flex flex-1 flex-col' : 'hidden'}`}>
+           <BibleSearch language={language} />
+        </div>
+
+        {/* Other Views are Lazy - Loaded on Demand */}
         <Suspense fallback={<LoadingScreen />}>
-          <div className={`${currentView === View.BIBLE_SEARCH ? 'flex flex-1 flex-col' : 'hidden'}`}>
-             <BibleSearch language={language} />
-          </div>
-          <div className={`${currentView === View.MISSIONARY ? 'flex flex-1 flex-col' : 'hidden'}`}>
-             <MissionaryBio language={language} />
-          </div>
-          <div className={`${currentView === View.SERMON ? 'flex flex-1 flex-col' : 'hidden'}`}>
-             <SermonBuilder language={language} />
-          </div>
-          <div className={`${currentView === View.AUDIO_COMPANION ? 'block h-[85vh] min-h-[500px]' : 'hidden'}`}>
-             <AudioCompanion language={language} isActiveView={currentView === View.AUDIO_COMPANION} />
-          </div>
-          <div className={`${currentView === View.HISTORY ? 'flex flex-1 flex-col' : 'hidden'}`}>
-             <HistoryView />
-          </div>
+          {visitedViews.has(View.MISSIONARY) && (
+             <div className={`${currentView === View.MISSIONARY ? 'flex flex-1 flex-col' : 'hidden'}`}>
+                <MissionaryBio language={language} />
+             </div>
+          )}
+          {visitedViews.has(View.SERMON) && (
+             <div className={`${currentView === View.SERMON ? 'flex flex-1 flex-col' : 'hidden'}`}>
+                <SermonBuilder language={language} />
+             </div>
+          )}
+          {visitedViews.has(View.AUDIO_COMPANION) && (
+             <div className={`${currentView === View.AUDIO_COMPANION ? 'block h-[85vh] min-h-[500px]' : 'hidden'}`}>
+                <AudioCompanion language={language} isActiveView={currentView === View.AUDIO_COMPANION} />
+             </div>
+          )}
+          {visitedViews.has(View.HISTORY) && (
+             <div className={`${currentView === View.HISTORY ? 'flex flex-1 flex-col' : 'hidden'}`}>
+                <HistoryView />
+             </div>
+          )}
         </Suspense>
       </main>
 

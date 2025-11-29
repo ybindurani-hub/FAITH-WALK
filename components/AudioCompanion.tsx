@@ -1,7 +1,9 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import { GoogleGenAI, LiveServerMessage, Modality } from '@google/genai';
 import { createPcmBlob, decodeAudioData } from '../utils/audioUtils';
 import { getApiKey } from '../services/gemini';
+import { saveToCache } from '../services/cache';
 
 interface AudioCompanionProps { language: string; isActiveView?: boolean; }
 
@@ -20,6 +22,9 @@ const AudioCompanion: React.FC<AudioCompanionProps> = ({ language, isActiveView 
   const sourcesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
   const sessionPromiseRef = useRef<Promise<any> | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+
+  // Transcript Accumulator
+  const transcriptRef = useRef<{ user: string; model: string }>({ user: '', model: '' });
 
   // Visualizer Refs
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -72,6 +77,9 @@ const AudioCompanion: React.FC<AudioCompanionProps> = ({ language, isActiveView 
         model: 'gemini-2.5-flash-native-audio-preview-09-2025',
         config: {
           responseModalities: [Modality.AUDIO],
+          // Enable Transcriptions for History
+          inputAudioTranscription: {}, 
+          outputAudioTranscription: {},
           speechConfig: {
             voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } },
           },
@@ -93,6 +101,7 @@ const AudioCompanion: React.FC<AudioCompanionProps> = ({ language, isActiveView 
             setupAudioInput(stream);
           },
           onmessage: async (message: LiveServerMessage) => {
+             // Handle Audio
              const base64Audio = message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
              if (base64Audio && outputContextRef.current) {
                 const ctx = outputContextRef.current;
@@ -110,10 +119,33 @@ const AudioCompanion: React.FC<AudioCompanionProps> = ({ language, isActiveView 
                 sourcesRef.current.add(source);
              }
 
+             // Handle Transcription
+             if (message.serverContent?.inputTranscription?.text) {
+                transcriptRef.current.user += message.serverContent.inputTranscription.text;
+             }
+             if (message.serverContent?.outputTranscription?.text) {
+                transcriptRef.current.model += message.serverContent.outputTranscription.text;
+             }
+
+             // Handle Turn Completion -> Save to History
+             if (message.serverContent?.turnComplete) {
+                if (transcriptRef.current.user.trim() || transcriptRef.current.model.trim()) {
+                    saveToCache('LIVE', transcriptRef.current.user, transcriptRef.current.model, language);
+                }
+                // Reset accumulators
+                transcriptRef.current = { user: '', model: '' };
+             }
+
+             // Handle Interruption
              if (message.serverContent?.interrupted) {
                 sourcesRef.current.forEach(src => src.stop());
                 sourcesRef.current.clear();
                 nextStartTimeRef.current = 0;
+                // Save whatever we have so far
+                if (transcriptRef.current.user.trim() || transcriptRef.current.model.trim()) {
+                    saveToCache('LIVE', transcriptRef.current.user, transcriptRef.current.model + " (Interrupted)", language);
+                    transcriptRef.current = { user: '', model: '' };
+                }
              }
           },
           onclose: () => {

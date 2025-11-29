@@ -30,7 +30,18 @@ const HistoryView: React.FC = () => {
       case 'BIBLE': return <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>;
       case 'BIO': return <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>;
       case 'SERMON': return <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>;
+      case 'LIVE': return <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>;
       default: return null;
+    }
+  };
+
+  const getLabel = (tool: string) => {
+    switch(tool) {
+      case 'BIO': return 'Biography';
+      case 'BIBLE': return 'Scripture';
+      case 'SERMON': return 'Sermon';
+      case 'LIVE': return 'Conversation';
+      default: return tool;
     }
   };
 
@@ -69,13 +80,20 @@ const HistoryView: React.FC = () => {
             <div key={item.id} className="bg-white dark:bg-slate-900 p-4 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 animate-in fade-in slide-in-from-bottom-2">
               <div className="flex items-center gap-2 mb-2 text-indigo-600 dark:text-indigo-400 text-xs font-bold uppercase tracking-wide">
                 {getIcon(item.tool)}
-                <span>{item.tool === 'BIO' ? 'Biography' : item.tool === 'BIBLE' ? 'Scripture' : 'Sermon'}</span>
+                <span>{getLabel(item.tool)}</span>
                 <span className="text-slate-400 font-normal ml-auto">{formatDate(item.timestamp)}</span>
               </div>
-              <p className="font-serif font-bold text-slate-800 dark:text-slate-200 mb-2 truncate">{item.query.replace(/::.*/, '')}</p>
-              <div className="text-slate-500 dark:text-slate-400 text-sm line-clamp-3 mb-3 font-serif">
-                {typeof item.result === 'string' ? item.result : item.result.text}
+              
+              <div className="mb-3">
+                 <p className="font-serif font-bold text-slate-800 dark:text-slate-200 mb-1">
+                   {item.tool === 'LIVE' ? 'User:' : ''} {item.query.replace(/::.*/, '')}
+                 </p>
+                 <div className={`text-slate-500 dark:text-slate-400 text-sm font-serif ${item.tool !== 'LIVE' ? 'line-clamp-3' : ''}`}>
+                    {item.tool === 'LIVE' && <span className="font-bold text-indigo-500 mr-1">AI:</span>}
+                    {typeof item.result === 'string' ? item.result : item.result.text}
+                 </div>
               </div>
+
               <button 
                 onClick={() => copyToClipboard(typeof item.result === 'string' ? item.result : item.result.text)}
                 className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 bg-indigo-50 dark:bg-indigo-900/20 px-3 py-2 rounded-lg w-full text-center hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-colors"
