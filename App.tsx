@@ -23,6 +23,7 @@ const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>(View.BIBLE_SEARCH);
   const [language, setLanguage] = useState<string>('en-US');
   const [darkMode, setDarkMode] = useState(false);
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
   
   // Track which views have been loaded to prevent lazy fetching before needed
   const [visitedViews, setVisitedViews] = useState<Set<View>>(new Set([View.BIBLE_SEARCH]));
@@ -35,6 +36,17 @@ const App: React.FC = () => {
     }
   }, [darkMode]);
 
+  useEffect(() => {
+    const handleOnline = () => setIsOffline(false);
+    const handleOffline = () => setIsOffline(true);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
   const changeView = (view: View) => {
     setCurrentView(view);
     setVisitedViews(prev => {
@@ -44,10 +56,12 @@ const App: React.FC = () => {
     });
   };
 
-  const NavButton = ({ view, label, icon }: { view: View; label: string; icon: React.ReactNode }) => (
+  const NavButton = ({ view, label, icon, disabled = false }: { view: View; label: string; icon: React.ReactNode, disabled?: boolean }) => (
     <button
-      onClick={() => changeView(view)}
+      onClick={() => !disabled && changeView(view)}
+      disabled={disabled}
       className={`flex flex-col items-center justify-center w-full py-3 transition-all duration-300 ${
+        disabled ? 'opacity-30 cursor-not-allowed' :
         currentView === view 
           ? 'text-indigo-600 dark:text-indigo-400 -translate-y-1' 
           : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'
@@ -63,7 +77,7 @@ const App: React.FC = () => {
   return (
     <div className="flex flex-col min-h-full w-full bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white font-sans transition-colors duration-300">
         
-      {/* Sticky Header - Use space-x instead of gap for Android 7 support */}
+      {/* Sticky Header */}
       <header className="sticky top-0 z-50 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-100 dark:border-slate-800 px-4 py-3 flex items-center justify-between shadow-sm">
         <div className="flex items-center space-x-2 text-indigo-700 dark:text-indigo-400">
           <div className="p-1.5 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg">
@@ -100,14 +114,19 @@ const App: React.FC = () => {
         </div>
       </header>
 
-      {/* Main Content - Grows to fill space, allowing natural scroll */}
+      {/* Offline Banner */}
+      {isOffline && (
+        <div className="bg-amber-500/90 text-white text-center py-2 text-xs font-bold animate-pulse">
+           OFFLINE MODE: Using saved history & cached assets. Live features disabled.
+        </div>
+      )}
+
+      {/* Main Content */}
       <main className="flex-1 w-full flex flex-col pb-40">
-        {/* Bible Search is Static - Instantly Visible */}
         <div className={`${currentView === View.BIBLE_SEARCH ? 'flex flex-1 flex-col' : 'hidden'}`}>
            <BibleSearch language={language} />
         </div>
 
-        {/* Other Views are Lazy - Loaded on Demand */}
         <Suspense fallback={<LoadingScreen />}>
           {visitedViews.has(View.MISSIONARY) && (
              <div className={`${currentView === View.MISSIONARY ? 'flex flex-1 flex-col' : 'hidden'}`}>
@@ -121,7 +140,7 @@ const App: React.FC = () => {
           )}
           {visitedViews.has(View.AUDIO_COMPANION) && (
              <div className={`${currentView === View.AUDIO_COMPANION ? 'block h-[85vh] min-h-[500px]' : 'hidden'}`}>
-                <AudioCompanion language={language} isActiveView={currentView === View.AUDIO_COMPANION} />
+                <AudioCompanion language={language} isActiveView={currentView === View.AUDIO_COMPANION && !isOffline} />
              </div>
           )}
           {visitedViews.has(View.HISTORY) && (
@@ -138,7 +157,12 @@ const App: React.FC = () => {
           <NavButton view={View.BIBLE_SEARCH} label="Scripture" icon={<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>} />
           <NavButton view={View.MISSIONARY} label="Missions" icon={<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>} />
           <NavButton view={View.SERMON} label="Sermons" icon={<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" /></svg>} />
-          <NavButton view={View.AUDIO_COMPANION} label="Live" icon={<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>} />
+          <NavButton 
+             view={View.AUDIO_COMPANION} 
+             label="Live" 
+             disabled={isOffline}
+             icon={<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>} 
+          />
            <NavButton view={View.HISTORY} label="History" icon={<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>} />
         </div>
       </nav>
