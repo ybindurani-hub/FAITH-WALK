@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import { GoogleGenAI, LiveServerMessage, Modality } from '@google/genai';
 import { createPcmBlob, decodeAudioData } from '../utils/audioUtils';
@@ -297,33 +296,33 @@ const AudioCompanion: React.FC<AudioCompanionProps> = ({ language, isActiveView 
             <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-amber-500/5 rounded-full blur-[100px]"></div>
         </div>
 
-        <div className="relative z-10 px-6 py-6 flex justify-between items-center border-b border-white/5 bg-black/20 backdrop-blur-sm shrink-0">
+        <div className="relative z-10 px-4 md:px-6 py-4 md:py-6 flex justify-between items-center border-b border-white/5 bg-black/20 backdrop-blur-sm shrink-0">
            <div>
-               <h2 className="text-xl font-serif font-bold text-white tracking-wide">Live Counselor</h2>
-               <p className="text-xs text-indigo-200 uppercase tracking-widest font-semibold">{status === 'connected' ? 'Online' : 'Standby'}</p>
+               <h2 className="text-lg md:text-xl font-serif font-bold text-white tracking-wide">Live Counselor</h2>
+               <p className="text-[10px] md:text-xs text-indigo-200 uppercase tracking-widest font-semibold">{status === 'connected' ? 'Online' : 'Standby'}</p>
            </div>
            <div className={`w-3 h-3 rounded-full ${status === 'connected' ? 'bg-green-400 shadow-[0_0_10px_#4ade80]' : status === 'connecting' ? 'bg-amber-400 animate-pulse' : 'bg-slate-600'}`}></div>
         </div>
 
         <div className="flex-1 flex flex-col items-center justify-center relative z-10 min-h-0">
-            <div className="relative mb-8">
-                <canvas ref={canvasRef} width={400} height={400} className="rounded-full max-w-[280px] max-h-[280px]" />
+            <div className="relative mb-6 md:mb-8">
+                <canvas ref={canvasRef} width={400} height={400} className="rounded-full max-w-[240px] max-h-[240px] md:max-w-[280px] md:max-h-[280px]" />
                 {!isActive && (
                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                        <div className="w-24 h-24 rounded-full border border-white/10 flex items-center justify-center bg-white/5 backdrop-blur-sm">
-                            <svg className="w-8 h-8 text-indigo-400/50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>
+                        <div className="w-20 h-20 md:w-24 md:h-24 rounded-full border border-white/10 flex items-center justify-center bg-white/5 backdrop-blur-sm">
+                            <svg className="w-6 h-6 md:w-8 md:h-8 text-indigo-400/50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>
                         </div>
                     </div>
                 )}
             </div>
-            <p className={`text-lg font-serif italic text-center max-w-sm transition-all duration-500 px-4 ${isActive ? 'text-indigo-100 opacity-100' : 'text-slate-500 opacity-0 translate-y-4'}`}>
+            <p className={`text-base md:text-lg font-serif italic text-center max-w-sm transition-all duration-500 px-4 ${isActive ? 'text-indigo-100 opacity-100' : 'text-slate-500 opacity-0 translate-y-4'}`}>
                "I am here to listen. Speak your heart."
             </p>
         </div>
 
-        <div className="p-8 flex flex-col items-center justify-center relative z-10 bg-gradient-to-t from-black/80 to-transparent shrink-0">
+        <div className="p-6 md:p-8 flex flex-col items-center justify-center relative z-10 bg-gradient-to-t from-black/80 to-transparent shrink-0">
             {errorMessage && (
-                <div className="mb-4 px-4 py-2 bg-red-900/40 border border-red-500/30 text-red-200 text-sm rounded-lg backdrop-blur-md animate-in slide-in-from-bottom-2">
+                <div className="mb-4 px-4 py-2 bg-red-900/40 border border-red-500/30 text-red-200 text-sm rounded-lg backdrop-blur-md animate-in slide-in-from-bottom-2 text-center">
                     {errorMessage}
                 </div>
             )}
@@ -331,7 +330,7 @@ const AudioCompanion: React.FC<AudioCompanionProps> = ({ language, isActiveView 
             <button
                 onClick={isActive ? stopSession : startSession}
                 disabled={status === 'connecting'}
-                className={`group relative flex items-center justify-center gap-3 px-10 py-5 rounded-full font-bold tracking-wider transition-all duration-300 shadow-2xl ${
+                className={`group relative flex items-center justify-center gap-3 px-6 py-3 md:px-10 md:py-5 rounded-full font-bold tracking-wider transition-all duration-300 shadow-2xl ${
                     isActive 
                         ? 'bg-red-500/20 text-red-200 border border-red-500/50 hover:bg-red-500/30' 
                         : 'bg-indigo-600 text-white hover:bg-indigo-500 hover:scale-105 shadow-indigo-500/30'
@@ -340,9 +339,9 @@ const AudioCompanion: React.FC<AudioCompanionProps> = ({ language, isActiveView 
                 {status === 'connecting' ? (
                    <> <span className="w-2 h-2 bg-white rounded-full animate-bounce"></span> CONNECTING... </>
                 ) : isActive ? (
-                   <> <span className="w-2 h-2 bg-red-400 rounded-full animate-pulse"></span> END SESSION </>
+                   <> <span className="w-2 h-2 bg-red-400 rounded-full animate-pulse"></span> END </>
                 ) : (
-                   <> <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg> START CONVERSATION </>
+                   <> <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg> START </>
                 )}
             </button>
             <p className="mt-4 text-[10px] text-slate-500 uppercase tracking-widest font-semibold">Gemini 2.5 Native Audio</p>

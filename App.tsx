@@ -78,17 +78,18 @@ const App: React.FC = () => {
     <div className="flex flex-col min-h-full w-full bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white font-sans transition-colors duration-300">
         
       {/* Sticky Header */}
-      <header className="sticky top-0 z-50 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-100 dark:border-slate-800 px-4 py-3 flex items-center justify-between shadow-sm">
-        <div className="flex items-center space-x-2 text-indigo-700 dark:text-indigo-400">
+      <header className="sticky top-0 z-50 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-100 dark:border-slate-800 px-4 py-3 flex items-center justify-between shadow-sm w-full">
+        <div className="flex items-center space-x-2 text-indigo-700 dark:text-indigo-400 shrink-0">
           <div className="p-1.5 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
             </svg>
           </div>
-          <h1 className="text-lg font-serif font-bold tracking-tight text-slate-800 dark:text-indigo-100 hidden sm:block">FaithWalk AI</h1>
+          {/* Hide title on very small screens if needed, otherwise just let it shrink */}
+          <h1 className="text-lg font-serif font-bold tracking-tight text-slate-800 dark:text-indigo-100 hidden xs:block sm:block">FaithWalk AI</h1>
         </div>
 
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-2 md:space-x-3 shrink-0">
           <button onClick={() => setDarkMode(!darkMode)} className="p-2 text-slate-400 hover:text-amber-500 dark:text-slate-500 dark:hover:text-yellow-300 transition-colors">
               {darkMode ? (
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
@@ -101,7 +102,7 @@ const App: React.FC = () => {
             <select 
               value={language} 
               onChange={(e) => setLanguage(e.target.value)}
-              className="appearance-none bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 py-2 pl-3 pr-8 rounded-lg text-xs font-bold uppercase tracking-wide focus:outline-none focus:ring-2 focus:ring-indigo-500 max-w-[120px] shadow-sm"
+              className="appearance-none bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 py-2 pl-3 pr-8 rounded-lg text-xs font-bold uppercase tracking-wide focus:outline-none focus:ring-2 focus:ring-indigo-500 max-w-[100px] md:max-w-[120px] shadow-sm"
             >
               {LANGUAGES.map(lang => (
                 <option key={lang.code} value={lang.code}>{lang.name}</option>
@@ -123,28 +124,28 @@ const App: React.FC = () => {
 
       {/* Main Content */}
       <main className="flex-1 w-full flex flex-col pb-40">
-        <div className={`${currentView === View.BIBLE_SEARCH ? 'flex flex-1 flex-col' : 'hidden'}`}>
+        <div className={`${currentView === View.BIBLE_SEARCH ? 'flex flex-1 flex-col w-full' : 'hidden'}`}>
            <BibleSearch language={language} />
         </div>
 
         <Suspense fallback={<LoadingScreen />}>
           {visitedViews.has(View.MISSIONARY) && (
-             <div className={`${currentView === View.MISSIONARY ? 'flex flex-1 flex-col' : 'hidden'}`}>
+             <div className={`${currentView === View.MISSIONARY ? 'flex flex-1 flex-col w-full' : 'hidden'}`}>
                 <MissionaryBio language={language} />
              </div>
           )}
           {visitedViews.has(View.SERMON) && (
-             <div className={`${currentView === View.SERMON ? 'flex flex-1 flex-col' : 'hidden'}`}>
+             <div className={`${currentView === View.SERMON ? 'flex flex-1 flex-col w-full' : 'hidden'}`}>
                 <SermonBuilder language={language} />
              </div>
           )}
           {visitedViews.has(View.AUDIO_COMPANION) && (
-             <div className={`${currentView === View.AUDIO_COMPANION ? 'block h-[85vh] min-h-[500px]' : 'hidden'}`}>
+             <div className={`${currentView === View.AUDIO_COMPANION ? 'block h-[85vh] min-h-[500px] w-full' : 'hidden'}`}>
                 <AudioCompanion language={language} isActiveView={currentView === View.AUDIO_COMPANION && !isOffline} />
              </div>
           )}
           {visitedViews.has(View.HISTORY) && (
-             <div className={`${currentView === View.HISTORY ? 'flex flex-1 flex-col' : 'hidden'}`}>
+             <div className={`${currentView === View.HISTORY ? 'flex flex-1 flex-col w-full' : 'hidden'}`}>
                 <HistoryView />
              </div>
           )}

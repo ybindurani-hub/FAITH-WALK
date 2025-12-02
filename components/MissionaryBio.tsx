@@ -78,19 +78,19 @@ const MissionaryBio: React.FC<MissionaryBioProps> = ({ language }) => {
   };
 
   return (
-    <div className="flex flex-col min-h-full relative">
+    <div className="flex flex-col min-h-full relative w-full max-w-screen-xl mx-auto">
       {loading && <LoadingScreen />}
 
-      <div className="p-4 max-w-3xl mx-auto w-full flex-1 flex flex-col">
-        <div className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/30 dark:to-orange-900/20 rounded-2xl p-8 mb-6 border border-amber-100 dark:border-amber-900/50 shadow-sm shrink-0 transition-colors">
-          <h2 className="text-3xl font-serif font-bold text-amber-900 dark:text-amber-100 mb-2">Heroes of Faith</h2>
+      <div className="p-3 md:p-6 w-full flex-1 flex flex-col">
+        <div className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/30 dark:to-orange-900/20 rounded-2xl p-4 md:p-8 mb-6 border border-amber-100 dark:border-amber-900/50 shadow-sm shrink-0 transition-colors">
+          <h2 className="text-2xl md:text-3xl font-serif font-bold text-amber-900 dark:text-amber-100 mb-2">Heroes of Faith</h2>
           <p className="text-amber-800/80 dark:text-amber-200/60 text-sm mb-6">Explore the lives of God's Generals, Revivalists, and Reformers.</p>
           
-          <div className="flex gap-2">
-            <div className="relative flex-1 group">
+          <div className="flex flex-col sm:flex-row gap-2 md:gap-3">
+            <div className="relative flex-1 group w-full">
               <input
                 type="text"
-                className="w-full p-4 pr-12 rounded-xl border-amber-200 dark:border-amber-800 bg-white dark:bg-slate-900 text-slate-800 dark:text-white shadow-sm focus:ring-2 focus:ring-amber-500 focus:outline-none transition-all"
+                className="w-full p-3 md:p-4 pr-12 rounded-xl border-amber-200 dark:border-amber-800 bg-white dark:bg-slate-900 text-slate-800 dark:text-white shadow-sm focus:ring-2 focus:ring-amber-500 focus:outline-none transition-all"
                 placeholder="e.g. Smith Wigglesworth, A.A. Allen..."
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -104,11 +104,10 @@ const MissionaryBio: React.FC<MissionaryBioProps> = ({ language }) => {
               </button>
             </div>
             
-            <button onClick={handleGenerate} disabled={loading} className="bg-amber-700 text-white px-6 md:px-8 py-3 rounded-xl font-bold tracking-wide hover:bg-amber-800 shadow-md hover:shadow-lg transition-all">Go</button>
+            <button onClick={handleGenerate} disabled={loading} className="w-full sm:w-auto bg-amber-700 text-white px-6 md:px-8 py-3 rounded-xl font-bold tracking-wide hover:bg-amber-800 shadow-md hover:shadow-lg transition-all">Go</button>
           </div>
         </div>
 
-        {/* Removed internal scrolling to fix WebView height bug */}
         <div className="flex-1 pb-4">
           {bioData && (
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-8 duration-700">
@@ -123,7 +122,7 @@ const MissionaryBio: React.FC<MissionaryBioProps> = ({ language }) => {
                 </div>
               )}
 
-              <div className="bg-white dark:bg-slate-900 p-8 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 relative transition-colors">
+              <div className="bg-white dark:bg-slate-900 p-4 md:p-8 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 relative transition-colors">
                  <div className="flex justify-end mb-6">
                      {audioUrl && <audio ref={audioRef} src={audioUrl} autoPlay onEnded={() => setIsPlaying(false)} onPause={() => setIsPlaying(false)} onPlay={() => setIsPlaying(true)} />}
                      {!audioUrl ? (
@@ -137,7 +136,7 @@ const MissionaryBio: React.FC<MissionaryBioProps> = ({ language }) => {
                      )}
                  </div>
 
-                <div className="prose prose-amber dark:prose-invert max-w-none font-serif text-slate-800 dark:text-slate-200 leading-loose">
+                <div className="prose prose-amber dark:prose-invert max-w-none font-serif text-slate-800 dark:text-slate-200 leading-loose prose-base md:prose-lg">
                   {cleanMarkdown(bioData.text).split('\n').map((line, i) => {
                     if (line.trim() === '') return <br key={i} />;
                     return <p key={i} className="mb-4">{line}</p>;

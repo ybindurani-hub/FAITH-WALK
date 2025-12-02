@@ -65,35 +65,34 @@ const BibleSearch: React.FC<BibleSearchProps> = ({ language }) => {
   const togglePlayback = () => { if (audioRef.current) isPlaying ? audioRef.current.pause() : audioRef.current.play(); };
 
   return (
-    <div className="flex flex-col min-h-full relative">
+    <div className="flex flex-col min-h-full relative w-full max-w-screen-xl mx-auto">
       {loading && <LoadingScreen />}
       
-      <div className="p-4 max-w-3xl mx-auto w-full flex-1 flex flex-col">
-        <h2 className="text-3xl font-serif font-bold text-slate-800 dark:text-white mb-6 text-center">Scripture Search</h2>
+      <div className="p-3 md:p-6 w-full flex-1 flex flex-col">
+        <h2 className="text-2xl md:text-3xl font-serif font-bold text-slate-800 dark:text-white mb-4 md:mb-6 text-center">Scripture Search</h2>
         
-        <div className="relative mb-6 group">
+        <div className="relative mb-6 group w-full">
           <input
             type="text"
-            className="w-full p-4 pr-24 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-white shadow-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none text-lg transition-all"
+            className="w-full p-3 md:p-4 pr-24 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-white shadow-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none text-base md:text-lg transition-all"
             placeholder="Ask a question..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
           />
           <div className="absolute right-2 top-2 bottom-2 flex gap-1">
-            <button onClick={startListening} className={`p-3 rounded-xl transition-all ${listening ? 'bg-red-50 text-red-600 animate-pulse' : 'text-slate-400 hover:text-indigo-600 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
+            <button onClick={startListening} className={`p-2 md:p-3 rounded-xl transition-all ${listening ? 'bg-red-50 text-red-600 animate-pulse' : 'text-slate-400 hover:text-indigo-600 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>
             </button>
-            <button onClick={handleSearch} disabled={loading} className="bg-indigo-600 text-white p-3 rounded-xl hover:bg-indigo-700 disabled:opacity-50 transition-all shadow-md">
+            <button onClick={handleSearch} disabled={loading} className="bg-indigo-600 text-white p-2 md:p-3 rounded-xl hover:bg-indigo-700 disabled:opacity-50 transition-all shadow-md">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
             </button>
           </div>
         </div>
 
-        {/* Removed internal scrolling (overflow-y-auto) to allow natural document flow */}
         <div className="flex-1 pb-4">
           {result && (
-            <div className="bg-white dark:bg-slate-900 p-8 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 animate-in fade-in slide-in-from-bottom-4 transition-colors">
+            <div className="bg-white dark:bg-slate-900 p-4 md:p-8 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 animate-in fade-in slide-in-from-bottom-4 transition-colors">
               <div className="flex justify-end mb-4 border-b border-slate-50 dark:border-slate-800 pb-2 gap-2">
                  {audioUrl && <audio ref={audioRef} src={audioUrl} autoPlay onEnded={() => setIsPlaying(false)} onPause={() => setIsPlaying(false)} onPlay={() => setIsPlaying(true)} />}
                  {!audioUrl ? (
@@ -106,7 +105,7 @@ const BibleSearch: React.FC<BibleSearchProps> = ({ language }) => {
                     </button>
                  )}
               </div>
-              <div className="prose prose-indigo dark:prose-invert prose-lg font-serif text-slate-700 dark:text-slate-300 max-w-none">
+              <div className="prose prose-indigo dark:prose-invert prose-base md:prose-lg font-serif text-slate-700 dark:text-slate-300 max-w-none">
                 {cleanMarkdown(result).split('\n').map((line, i) => {
                   if (line.trim() === '') return <br key={i} />;
                   return <p key={i} className="mb-3 leading-relaxed">{line}</p>;
