@@ -67,7 +67,8 @@ const AudioCompanion: React.FC<AudioCompanionProps> = ({ language, isActiveView 
         audio: { 
           echoCancellation: true, 
           noiseSuppression: true,
-          autoGainControl: true 
+          autoGainControl: true,
+          channelCount: 1
         } 
       });
       streamRef.current = stream;
@@ -82,12 +83,20 @@ const AudioCompanion: React.FC<AudioCompanionProps> = ({ language, isActiveView 
           speechConfig: {
             voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } },
           },
-          systemInstruction: `You are BiblioGuide, a professional, warm, and wise Christian Pastor AI.
+          systemInstruction: `You are BiblioGuide, an advanced AI acting as a Senior Pastor, Bible Scholar, and Spiritual Counselor.
           User Language: ${language}.
-          BE CONCISE: Keep answers short (1-3 sentences).
-          BE WARM: Speak with empathy.
-          NO FLUFF: Jump straight to the answer.
-          If non-English, reply in that language.`,
+          
+          YOUR PERSONA:
+          1. PASTORAL: Speak with authority, warmth, and deep spiritual insight. Use phrases like "The Word says..." or "Beloved...".
+          2. SCHOLARLY: Be theologically accurate. Reference specific Bible verses, context, and history where helpful.
+          3. COUNSELOR: Listen with empathy. Offer practical, scripture-based wisdom for life's problems.
+
+          CRITICAL RULES FOR SPEED:
+          - REPLY INSTANTLY.
+          - NO FLUFF. Do not say "That is a great question" or "I understand". Start answering immediately.
+          - KEEP IT CONCISE. 2-4 sentences max unless asked for a sermon.
+          
+          If the user speaks a language other than English, reply fluently and naturally in that language.`,
         },
       };
 
@@ -105,6 +114,7 @@ const AudioCompanion: React.FC<AudioCompanionProps> = ({ language, isActiveView 
              if (base64Audio && outputContextRef.current) {
                 const ctx = outputContextRef.current;
                 const currentTime = ctx.currentTime;
+                // Low latency: reset timing if we drift behind
                 if (nextStartTimeRef.current < currentTime) {
                     nextStartTimeRef.current = currentTime;
                 }
@@ -178,7 +188,10 @@ const AudioCompanion: React.FC<AudioCompanionProps> = ({ language, isActiveView 
     if (!inputContextRef.current) return;
     const ctx = inputContextRef.current;
     const source = ctx.createMediaStreamSource(stream);
-    const processor = ctx.createScriptProcessor(4096, 1, 1);
+    
+    // REDUCED BUFFER SIZE: 2048 instead of 4096
+    // This reduces input latency by ~50% (approx 125ms instead of 250ms), making the AI hear you faster.
+    const processor = ctx.createScriptProcessor(2048, 1, 1);
     
     processor.onaudioprocess = (e) => {
         if (!inputContextRef.current) return;
