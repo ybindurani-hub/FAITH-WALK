@@ -42,8 +42,7 @@ export const createPcmBlob = (data: Float32Array): Blob => {
     int16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
   }
   
-  // Custom manual base64 encoding to avoid external lib dependency issues in some environments
-  // or use standard btoa on string constructed from bytes.
+  // Custom manual base64 encoding
   let binary = '';
   const bytes = new Uint8Array(int16.buffer);
   const len = bytes.byteLength;
@@ -70,7 +69,8 @@ export const decodeAudioData = async (
     bytes[i] = binaryString.charCodeAt(i);
   }
   
-  const dataInt16 = new Int16Array(bytes.buffer);
+  // Create Int16 view safely
+  const dataInt16 = new Int16Array(bytes.buffer, bytes.byteOffset, bytes.byteLength / 2);
   const buffer = ctx.createBuffer(1, dataInt16.length, sampleRate);
   const channelData = buffer.getChannelData(0);
   
@@ -79,4 +79,26 @@ export const decodeAudioData = async (
   }
   
   return buffer;
+};
+
+export const downsampleBuffer = (buffer: Float32Array, inputRate: number, outputRate: number): Float32Array => {
+  if (outputRate === inputRate) return buffer;
+  const sampleRateRatio = inputRate / outputRate;
+  const newLength = Math.round(buffer.length / sampleRateRatio);
+  const result = new Float32Array(newLength);
+  let offsetResult = 0;
+  let offsetBuffer = 0;
+  
+  while (offsetResult < newLength) {
+    const nextOffsetBuffer = Math.round((offsetResult + 1) * sampleRateRatio);
+    let accum = 0, count = 0;
+    for (let i = offsetBuffer; i < nextOffsetBuffer && i < buffer.length; i++) {
+      accum += buffer[i];
+      count++;
+    }
+    result[offsetResult] = count > 0 ? accum / count : 0;
+    offsetResult++;
+    offsetBuffer = nextOffsetBuffer;
+  }
+  return result;
 };
